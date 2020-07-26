@@ -1,0 +1,3 @@
+port: 8080
+network: Mainnet
+rich_node_rpc: 'http://localhost:8117'
