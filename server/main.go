@@ -62,7 +62,7 @@ func main() {
 		Network:    c.Network,
 	}
 
-	asserter, err := asserter.NewServer([]*types.NetworkIdentifier{network})
+	asserter, err := asserter.NewServer([]string{"Transfer", "Reward"}, false, []*types.NetworkIdentifier{network})
 	if err != nil {
 		log.Fatalf("initial server error: %v", err)
 	}
