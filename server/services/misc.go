@@ -39,6 +39,12 @@ var (
 		Retriable: true,
 	}
 
+	UnsupportedCurveTypeError = &types.Error{
+		Code:      6,
+		Message:   "unsupported curve type error",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,

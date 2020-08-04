@@ -3,9 +3,13 @@ package services
 import (
 	"context"
 	"fmt"
+
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ququzone/ckb-rich-sdk-go/rpc"
+	"github.com/ququzone/ckb-sdk-go/address"
+	"github.com/ququzone/ckb-sdk-go/crypto/blake2b"
+	ckbTypes "github.com/ququzone/ckb-sdk-go/types"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIServicer interface.
@@ -42,10 +46,43 @@ func (s *ConstructionAPIService) ConstructionCombine(
 
 // ConstructionDerive implements the /construction/derive endpoint.
 func (s *ConstructionAPIService) ConstructionDerive(
-	context.Context,
-	*types.ConstructionDeriveRequest,
+	ctx context.Context,
+	request *types.ConstructionDeriveRequest,
 ) (*types.ConstructionDeriveResponse, *types.Error) {
-	panic("implement me")
+	if request.PublicKey.CurveType != types.Secp256k1 {
+		return nil, UnsupportedCurveTypeError
+	}
+
+	args, err := blake2b.Blake160(request.PublicKey.Bytes)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      5,
+			Message:   fmt.Sprintf("server error: %v", err),
+			Retriable: true,
+		}
+	}
+
+	prefix := address.Mainnet
+	if s.network.Network != "Mainnet" {
+		prefix = address.Testnet
+	}
+
+	addr, err := address.Generate(prefix, &ckbTypes.Script{
+		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+		HashType: ckbTypes.HashTypeType,
+		Args:     args,
+	})
+	if err != nil {
+		return nil, &types.Error{
+			Code:      5,
+			Message:   fmt.Sprintf("server error: %v", err),
+			Retriable: true,
+		}
+	}
+
+	return &types.ConstructionDeriveResponse{
+		Address: addr,
+	}, nil
 }
 
 // ConstructionHash implements the /construction/hash endpoint.
