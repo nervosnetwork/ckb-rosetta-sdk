@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ququzone/ckb-rich-sdk-go/indexer"
 	"github.com/ququzone/ckb-rich-sdk-go/rpc"
 	"github.com/ququzone/ckb-sdk-go/address"
 	"github.com/ququzone/ckb-sdk-go/crypto/blake2b"
@@ -111,10 +113,70 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 
 // ConstructionPreprocess implements the /construction/preprocess endpoint.
 func (s *ConstructionAPIService) ConstructionPreprocess(
-	context.Context,
-	*types.ConstructionPreprocessRequest,
+	ctx context.Context,
+	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	panic("implement me")
+	input := int64(0)
+	output := int64(0)
+	for _, operation := range request.Operations {
+		addr, err := address.Parse(operation.Account.Address)
+		if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
+			addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
+			return nil, &types.Error{
+				Code:      7,
+				Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
+				Retriable: true,
+			}
+		}
+
+		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
+		if err != nil || amount == 0 {
+			fmt.Println(err)
+			return nil, &types.Error{
+				Code:      8,
+				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
+				Retriable: true,
+			}
+		}
+		if amount > 0 {
+			if amount < MinCapacity {
+				return nil, &types.Error{
+					Code:      9,
+					Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
+					Retriable: true,
+				}
+			}
+			output += amount
+		} else {
+			amount = -amount
+			capacity, err := s.client.GetCellsCapacity(context.Background(), &indexer.SearchKey{
+				Script:     addr.Script,
+				ScriptType: indexer.ScriptTypeLock,
+			})
+			if err != nil {
+				return nil, RpcError
+			}
+			if uint64(amount) > capacity.Capacity {
+				return nil, &types.Error{
+					Code:      10,
+					Message:   fmt.Sprintf("insufficient balance: %s", operation.Amount.Value),
+					Retriable: true,
+				}
+			}
+
+			input += amount
+		}
+	}
+
+	if output >= input {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("capacity overflow"),
+			Retriable: true,
+		}
+	}
+
+	return &types.ConstructionPreprocessResponse{}, nil
 }
 
 // ConstructionSubmit implements the /construction/submit endpoint.

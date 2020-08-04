@@ -49,6 +49,8 @@ var (
 		Symbol:   "CKB",
 		Decimals: 8,
 	}
+
+	MinCapacity int64 = 6100000000
 )
 
 func GenerateAddress(network *types.NetworkIdentifier, script *typesCKB.Script) string {
