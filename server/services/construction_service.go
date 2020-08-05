@@ -43,10 +43,32 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 
 // ConstructionCombine implements the /construction/combine endpoint.
 func (s *ConstructionAPIService) ConstructionCombine(
-	context.Context,
-	*types.ConstructionCombineRequest,
+	ctx context.Context,
+	request *types.ConstructionCombineRequest,
 ) (*types.ConstructionCombineResponse, *types.Error) {
-	panic("implement me")
+	tx, err := ckbRpc.TransactionFromString(request.UnsignedTransaction)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.UnsignedTransaction),
+			Retriable: false,
+		}
+	}
+	index := 0
+	for i, witness := range tx.Witnesses {
+		if len(witness) != 0 {
+			tx.Witnesses[i] = request.Signatures[index].Bytes
+			index++
+		}
+	}
+
+	txString, err := ckbRpc.TransactionString(tx)
+	if err != nil {
+		return nil, ServerError
+	}
+	return &types.ConstructionCombineResponse{
+		SignedTransaction: txString,
+	}, nil
 }
 
 // ConstructionDerive implements the /construction/derive endpoint.
@@ -274,11 +296,12 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 			if err != nil {
 				return nil, ServerError
 			}
+
+			// TODO remove to transaction generated
 			payload, err := ckbTransaction.SingleSegmentSignMessage(tx, group[0], group[0]+len(group), witnessArgs)
 			if err != nil {
 				return nil, ServerError
 			}
-
 			payloads = append(payloads, &types.SigningPayload{
 				Address:       operation.Account.Address,
 				Bytes:         payload,
