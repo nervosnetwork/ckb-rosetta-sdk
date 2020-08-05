@@ -121,10 +121,72 @@ func (s *ConstructionAPIService) ConstructionHash(
 
 // ConstructionParse implements the /construction/parse endpoint.
 func (s *ConstructionAPIService) ConstructionParse(
-	context.Context,
-	*types.ConstructionParseRequest,
+	ctx context.Context,
+	request *types.ConstructionParseRequest,
 ) (*types.ConstructionParseResponse, *types.Error) {
-	panic("implement me")
+	tx, err := ckbRpc.TransactionFromString(request.Transaction)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.Transaction),
+			Retriable: false,
+		}
+	}
+
+	signers := make(map[string]bool)
+	index := int64(0)
+	operations := make([]*types.Operation, 0)
+	for _, input := range tx.Inputs {
+		ptx, err := s.client.GetTransaction(ctx, input.PreviousOutput.TxHash)
+		if err != nil {
+			return nil, ServerError
+		}
+
+		addr := GenerateAddress(s.network, ptx.Transaction.Outputs[input.PreviousOutput.Index].Lock)
+		signers[addr] = true
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: index,
+			},
+			Type:   "Transfer",
+			Status: "Success",
+			Account: &types.AccountIdentifier{
+				Address: addr,
+			},
+			Amount: &types.Amount{
+				Value:    fmt.Sprintf("-%d", ptx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
+				Currency: CkbCurrency,
+			},
+		})
+		index++
+	}
+	for _, output := range tx.Outputs {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: index,
+			},
+			Type:   "Transfer",
+			Status: "Success",
+			Account: &types.AccountIdentifier{
+				Address: GenerateAddress(s.network, output.Lock),
+			},
+			Amount: &types.Amount{
+				Value:    fmt.Sprintf("%d", output.Capacity),
+				Currency: CkbCurrency,
+			},
+		})
+		index++
+	}
+
+	addresses := make([]string, 0, len(signers))
+	for addr := range signers {
+		addresses = append(addresses, addr)
+	}
+
+	return &types.ConstructionParseResponse{
+		Operations: operations,
+		Signers:    addresses,
+	}, nil
 }
 
 // ConstructionPayloads implements the /construction/payloads endpoint.
