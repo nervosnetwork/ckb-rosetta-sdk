@@ -92,10 +92,31 @@ func (s *ConstructionAPIService) ConstructionDerive(
 
 // ConstructionHash implements the /construction/hash endpoint.
 func (s *ConstructionAPIService) ConstructionHash(
-	context.Context,
-	*types.ConstructionHashRequest,
+	ctx context.Context,
+	request *types.ConstructionHashRequest,
 ) (*types.TransactionIdentifierResponse, *types.Error) {
-	panic("implement me")
+	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.SignedTransaction),
+			Retriable: false,
+		}
+	}
+	hash, err := tx.ComputeHash()
+	if err != nil {
+		return nil, &types.Error{
+			Code:      12,
+			Message:   fmt.Sprintf("compute hash error: %v", err),
+			Retriable: false,
+		}
+	}
+
+	return &types.TransactionIdentifierResponse{
+		TransactionIdentifier: &types.TransactionIdentifier{
+			Hash: hash.String(),
+		},
+	}, nil
 }
 
 // ConstructionParse implements the /construction/parse endpoint.
