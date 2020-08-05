@@ -11,7 +11,10 @@ import (
 	"github.com/ququzone/ckb-rich-sdk-go/rpc"
 	"github.com/ququzone/ckb-sdk-go/address"
 	"github.com/ququzone/ckb-sdk-go/crypto/blake2b"
+	ckbRpc "github.com/ququzone/ckb-sdk-go/rpc"
+	ckbTransaction "github.com/ququzone/ckb-sdk-go/transaction"
 	ckbTypes "github.com/ququzone/ckb-sdk-go/types"
+	"github.com/ququzone/ckb-sdk-go/utils"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIServicer interface.
@@ -105,10 +108,107 @@ func (s *ConstructionAPIService) ConstructionParse(
 
 // ConstructionPayloads implements the /construction/payloads endpoint.
 func (s *ConstructionAPIService) ConstructionPayloads(
-	context.Context,
-	*types.ConstructionPayloadsRequest,
+	ctx context.Context,
+	request *types.ConstructionPayloadsRequest,
 ) (*types.ConstructionPayloadsResponse, *types.Error) {
-	panic("implement me")
+
+	systemScripts, err := utils.NewSystemScripts(s.client)
+	if err != nil {
+		return nil, ServerError
+	}
+
+	tx := ckbTransaction.NewSecp256k1SingleSigTx(systemScripts)
+	payloads := make([]*types.SigningPayload, 0)
+	for _, operation := range request.Operations {
+		addr, err := address.Parse(operation.Account.Address)
+		if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
+			addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
+			return nil, &types.Error{
+				Code:      7,
+				Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
+				Retriable: true,
+			}
+		}
+
+		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
+		if err != nil || amount == 0 {
+			return nil, &types.Error{
+				Code:      8,
+				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
+				Retriable: true,
+			}
+		}
+		if amount > 0 {
+			if amount < MinCapacity {
+				return nil, &types.Error{
+					Code:      9,
+					Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
+					Retriable: true,
+				}
+			}
+
+			tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
+				Capacity: uint64(amount),
+				Lock:     addr.Script,
+			})
+			tx.OutputsData = append(tx.OutputsData, []byte{})
+		} else {
+			amount = -amount
+
+			liveCells, err := s.client.GetCells(context.Background(), &indexer.SearchKey{
+				Script:     addr.Script,
+				ScriptType: indexer.ScriptTypeLock,
+			}, indexer.SearchOrderAsc, 1000, "")
+			if err != nil {
+				return nil, ServerError
+			}
+
+			fromCapacity := int64(0)
+			inputs := make([]*ckbTypes.Cell, 0)
+			for _, cell := range liveCells.Objects {
+				if cell.Output.Type == nil && len(cell.OutputData) == 0 {
+					fromCapacity += int64(cell.Output.Capacity)
+					inputs = append(inputs, &ckbTypes.Cell{
+						OutPoint: &ckbTypes.OutPoint{
+							TxHash: cell.OutPoint.TxHash,
+							Index:  cell.OutPoint.Index,
+						},
+					})
+					if fromCapacity < amount {
+						continue
+					}
+					if fromCapacity-amount >= MinCapacity {
+						tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
+							Capacity: uint64(fromCapacity - amount),
+							Lock:     addr.Script,
+						})
+						tx.OutputsData = append(tx.OutputsData, []byte{})
+					}
+				}
+			}
+
+			group, witnessArgs, err := ckbTransaction.AddInputsForTransaction(tx, inputs)
+			if err != nil {
+				return nil, ServerError
+			}
+			payload, err := ckbTransaction.SingleSegmentSignMessage(tx, group[0], group[0]+len(group), witnessArgs)
+			if err != nil {
+				return nil, ServerError
+			}
+
+			payloads = append(payloads, &types.SigningPayload{
+				Address:       operation.Account.Address,
+				Bytes:         payload,
+				SignatureType: types.EcdsaRecovery,
+			})
+		}
+	}
+
+	txString, err := ckbRpc.TransactionString(tx)
+	return &types.ConstructionPayloadsResponse{
+		UnsignedTransaction: txString,
+		Payloads:            payloads,
+	}, nil
 }
 
 // ConstructionPreprocess implements the /construction/preprocess endpoint.
@@ -131,7 +231,6 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 
 		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
 		if err != nil || amount == 0 {
-			fmt.Println(err)
 			return nil, &types.Error{
 				Code:      8,
 				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
