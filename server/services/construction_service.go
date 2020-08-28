@@ -31,6 +31,29 @@ func NewConstructionAPIService(network *types.NetworkIdentifier, client rpc.Clie
 	}
 }
 
+// ConstructionPreprocess implements the /construction/preprocess endpoint.
+func (s *ConstructionAPIService) ConstructionPreprocess(
+	ctx context.Context,
+	request *types.ConstructionPreprocessRequest,
+) (*types.ConstructionPreprocessResponse, *types.Error) {
+	input, err := validateVinOperations(request)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := validateVoutOperations(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateCapacity(input, output)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.ConstructionPreprocessResponse{}, nil
+}
+
 // ConstructionMetadata implements the /construction/metadata endpoint.
 func (s *ConstructionAPIService) ConstructionMetadata(
 	context.Context,
@@ -38,176 +61,6 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 ) (*types.ConstructionMetadataResponse, *types.Error) {
 	return &types.ConstructionMetadataResponse{
 		Metadata: map[string]interface{}{},
-	}, nil
-}
-
-// ConstructionCombine implements the /construction/combine endpoint.
-func (s *ConstructionAPIService) ConstructionCombine(
-	ctx context.Context,
-	request *types.ConstructionCombineRequest,
-) (*types.ConstructionCombineResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.UnsignedTransaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.UnsignedTransaction),
-			Retriable: false,
-		}
-	}
-	index := 0
-	for i, witness := range tx.Witnesses {
-		if len(witness) != 0 {
-			tx.Witnesses[i] = request.Signatures[index].Bytes
-			index++
-		}
-	}
-
-	txString, err := ckbRpc.TransactionString(tx)
-	if err != nil {
-		return nil, ServerError
-	}
-	return &types.ConstructionCombineResponse{
-		SignedTransaction: txString,
-	}, nil
-}
-
-// ConstructionDerive implements the /construction/derive endpoint.
-func (s *ConstructionAPIService) ConstructionDerive(
-	ctx context.Context,
-	request *types.ConstructionDeriveRequest,
-) (*types.ConstructionDeriveResponse, *types.Error) {
-	if request.PublicKey.CurveType != types.Secp256k1 {
-		return nil, UnsupportedCurveTypeError
-	}
-
-	args, err := blake2b.Blake160(request.PublicKey.Bytes)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
-		}
-	}
-
-	prefix := address.Mainnet
-	if s.network.Network != "Mainnet" {
-		prefix = address.Testnet
-	}
-
-	addr, err := address.Generate(prefix, &ckbTypes.Script{
-		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
-		HashType: ckbTypes.HashTypeType,
-		Args:     args,
-	})
-	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
-		}
-	}
-
-	return &types.ConstructionDeriveResponse{
-		Address: addr,
-	}, nil
-}
-
-// ConstructionHash implements the /construction/hash endpoint.
-func (s *ConstructionAPIService) ConstructionHash(
-	ctx context.Context,
-	request *types.ConstructionHashRequest,
-) (*types.TransactionIdentifierResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.SignedTransaction),
-			Retriable: false,
-		}
-	}
-	hash, err := tx.ComputeHash()
-	if err != nil {
-		return nil, &types.Error{
-			Code:      12,
-			Message:   fmt.Sprintf("compute hash error: %v", err),
-			Retriable: false,
-		}
-	}
-
-	return &types.TransactionIdentifierResponse{
-		TransactionIdentifier: &types.TransactionIdentifier{
-			Hash: hash.String(),
-		},
-	}, nil
-}
-
-// ConstructionParse implements the /construction/parse endpoint.
-func (s *ConstructionAPIService) ConstructionParse(
-	ctx context.Context,
-	request *types.ConstructionParseRequest,
-) (*types.ConstructionParseResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.Transaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.Transaction),
-			Retriable: false,
-		}
-	}
-
-	signers := make(map[string]bool)
-	index := int64(0)
-	operations := make([]*types.Operation, 0)
-	for _, input := range tx.Inputs {
-		ptx, err := s.client.GetTransaction(ctx, input.PreviousOutput.TxHash)
-		if err != nil {
-			return nil, ServerError
-		}
-
-		addr := GenerateAddress(s.network, ptx.Transaction.Outputs[input.PreviousOutput.Index].Lock)
-		signers[addr] = true
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
-			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: addr,
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%d", ptx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
-				Currency: CkbCurrency,
-			},
-		})
-		index++
-	}
-	for _, output := range tx.Outputs {
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
-			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: GenerateAddress(s.network, output.Lock),
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("%d", output.Capacity),
-				Currency: CkbCurrency,
-			},
-		})
-		index++
-	}
-
-	addresses := make([]string, 0, len(signers))
-	for addr := range signers {
-		addresses = append(addresses, addr)
-	}
-
-	return &types.ConstructionParseResponse{
-		Operations: operations,
-		Signers:    addresses,
 	}, nil
 }
 
@@ -317,27 +170,133 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	}, nil
 }
 
-// ConstructionPreprocess implements the /construction/preprocess endpoint.
-func (s *ConstructionAPIService) ConstructionPreprocess(
+// ConstructionCombine implements the /construction/combine endpoint.
+func (s *ConstructionAPIService) ConstructionCombine(
 	ctx context.Context,
-	request *types.ConstructionPreprocessRequest,
-) (*types.ConstructionPreprocessResponse, *types.Error) {
-	input, err := validateVinOperations(request)
+	request *types.ConstructionCombineRequest,
+) (*types.ConstructionCombineResponse, *types.Error) {
+	tx, err := ckbRpc.TransactionFromString(request.UnsignedTransaction)
 	if err != nil {
-		return nil, err
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.UnsignedTransaction),
+			Retriable: false,
+		}
+	}
+	index := 0
+	for i, witness := range tx.Witnesses {
+		if len(witness) != 0 {
+			tx.Witnesses[i] = request.Signatures[index].Bytes
+			index++
+		}
 	}
 
-	output, err := validateVoutOperations(request)
+	txString, err := ckbRpc.TransactionString(tx)
 	if err != nil {
-		return nil, err
+		return nil, ServerError
+	}
+	return &types.ConstructionCombineResponse{
+		SignedTransaction: txString,
+	}, nil
+}
+
+// ConstructionParse implements the /construction/parse endpoint.
+func (s *ConstructionAPIService) ConstructionParse(
+	ctx context.Context,
+	request *types.ConstructionParseRequest,
+) (*types.ConstructionParseResponse, *types.Error) {
+	tx, err := ckbRpc.TransactionFromString(request.Transaction)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.Transaction),
+			Retriable: false,
+		}
 	}
 
-	err = validateCapacity(input, output)
-	if err != nil {
-		return nil, err
+	signers := make(map[string]bool)
+	index := int64(0)
+	operations := make([]*types.Operation, 0)
+	for _, input := range tx.Inputs {
+		ptx, err := s.client.GetTransaction(ctx, input.PreviousOutput.TxHash)
+		if err != nil {
+			return nil, ServerError
+		}
+
+		addr := GenerateAddress(s.network, ptx.Transaction.Outputs[input.PreviousOutput.Index].Lock)
+		signers[addr] = true
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: index,
+			},
+			Type:   "Transfer",
+			Status: "Success",
+			Account: &types.AccountIdentifier{
+				Address: addr,
+			},
+			Amount: &types.Amount{
+				Value:    fmt.Sprintf("-%d", ptx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
+				Currency: CkbCurrency,
+			},
+		})
+		index++
+	}
+	for _, output := range tx.Outputs {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: index,
+			},
+			Type:   "Transfer",
+			Status: "Success",
+			Account: &types.AccountIdentifier{
+				Address: GenerateAddress(s.network, output.Lock),
+			},
+			Amount: &types.Amount{
+				Value:    fmt.Sprintf("%d", output.Capacity),
+				Currency: CkbCurrency,
+			},
+		})
+		index++
 	}
 
-	return &types.ConstructionPreprocessResponse{}, nil
+	addresses := make([]string, 0, len(signers))
+	for addr := range signers {
+		addresses = append(addresses, addr)
+	}
+
+	return &types.ConstructionParseResponse{
+		Operations: operations,
+		Signers:    addresses,
+	}, nil
+}
+
+// ConstructionHash implements the /construction/hash endpoint.
+func (s *ConstructionAPIService) ConstructionHash(
+	ctx context.Context,
+	request *types.ConstructionHashRequest,
+) (*types.TransactionIdentifierResponse, *types.Error) {
+	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      11,
+			Message:   fmt.Sprintf("can not decode transaction string: %s", request.SignedTransaction),
+			Retriable: false,
+		}
+	}
+	hash, err := tx.ComputeHash()
+	if err != nil {
+		return nil, &types.Error{
+			Code:      12,
+			Message:   fmt.Sprintf("compute hash error: %v", err),
+			Retriable: false,
+		}
+	}
+
+	return &types.TransactionIdentifierResponse{
+		TransactionIdentifier: &types.TransactionIdentifier{
+			Hash: hash.String(),
+		},
+	}, nil
 }
 
 // ConstructionSubmit implements the /construction/submit endpoint.
@@ -367,5 +326,46 @@ func (s *ConstructionAPIService) ConstructionSubmit(
 		TransactionIdentifier: &types.TransactionIdentifier{
 			Hash: hash.String(),
 		},
+	}, nil
+}
+
+// ConstructionDerive implements the /construction/derive endpoint.
+func (s *ConstructionAPIService) ConstructionDerive(
+	ctx context.Context,
+	request *types.ConstructionDeriveRequest,
+) (*types.ConstructionDeriveResponse, *types.Error) {
+	if request.PublicKey.CurveType != types.Secp256k1 {
+		return nil, UnsupportedCurveTypeError
+	}
+
+	args, err := blake2b.Blake160(request.PublicKey.Bytes)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      5,
+			Message:   fmt.Sprintf("server error: %v", err),
+			Retriable: true,
+		}
+	}
+
+	prefix := address.Mainnet
+	if s.network.Network != "Mainnet" {
+		prefix = address.Testnet
+	}
+
+	addr, err := address.Generate(prefix, &ckbTypes.Script{
+		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
+		HashType: ckbTypes.HashTypeType,
+		Args:     args,
+	})
+	if err != nil {
+		return nil, &types.Error{
+			Code:      5,
+			Message:   fmt.Sprintf("server error: %v", err),
+			Retriable: true,
+		}
+	}
+
+	return &types.ConstructionDeriveResponse{
+		Address: addr,
 	}, nil
 }
