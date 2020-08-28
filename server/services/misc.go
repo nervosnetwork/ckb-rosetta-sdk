@@ -21,7 +21,7 @@ var (
 		Retriable: true,
 	}
 
-	AddressError = &types.Error{
+	AddressParseError = &types.Error{
 		Code:      3,
 		Message:   "address error",
 		Retriable: false,

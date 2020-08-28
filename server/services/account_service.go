@@ -32,7 +32,7 @@ func (s *AccountAPIService) AccountBalance(
 ) (*types.AccountBalanceResponse, *types.Error) {
 	addr, err := address.Parse(request.AccountIdentifier.Address)
 	if err != nil {
-		return nil, AddressError
+		return nil, AddressParseError
 	}
 
 	capacity, err := s.client.GetCellsCapacity(context.Background(), &indexer.SearchKey{

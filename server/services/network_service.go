@@ -8,7 +8,7 @@ import (
 	"github.com/ququzone/ckb-rich-sdk-go/rpc"
 )
 
-// NetworkAPIService implements the server.NetworkAPIServicer interface.
+// NetworkAPIService implements the server.NetworkAPIService interface.
 type NetworkAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
@@ -97,14 +97,11 @@ func (s *NetworkAPIService) NetworkOptions(
 					Successful: true,
 				},
 			},
-			OperationTypes: []string{
-				"Transfer",
-				"Reward",
-			},
+			OperationTypes: SupportedOperationTypes,
 			Errors: []*types.Error{
 				NoImplementError,
 				RpcError,
-				AddressError,
+				AddressParseError,
 				SubmitError,
 			},
 		},
