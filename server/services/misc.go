@@ -1,7 +1,9 @@
 package services
 
 import (
+	"fmt"
 	"log"
+	"math"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ququzone/ckb-sdk-go/address"
@@ -11,37 +13,85 @@ import (
 var (
 	NoImplementError = &types.Error{
 		Code:      1,
-		Message:   "not implemented",
+		Message:   "Not implemented.",
 		Retriable: false,
 	}
 
 	RpcError = &types.Error{
 		Code:      2,
-		Message:   "rpc error",
+		Message:   "RPC error.",
 		Retriable: true,
 	}
 
 	AddressParseError = &types.Error{
 		Code:      3,
-		Message:   "address error",
+		Message:   "Address parse error.",
 		Retriable: false,
 	}
 
 	SubmitError = &types.Error{
 		Code:      4,
-		Message:   "submit transaction error",
+		Message:   "Submit transaction error.",
 		Retriable: true,
 	}
 
 	ServerError = &types.Error{
 		Code:      5,
-		Message:   "server error",
+		Message:   "Server error.",
 		Retriable: true,
 	}
 
 	UnsupportedCurveTypeError = &types.Error{
 		Code:      6,
-		Message:   "unsupported curve type error",
+		Message:   "Unsupported curve type error.",
+		Retriable: false,
+	}
+
+	MissingVinOperationsError = &types.Error{
+		Code:      7,
+		Message:   "Must have Vin type operations.",
+		Retriable: false,
+	}
+
+	MissingVoutOperationsError = &types.Error{
+		Code:      8,
+		Message:   "Must have Vout type operations.",
+		Retriable: false,
+	}
+
+	InvalidVinOperationAmountValueError = &types.Error{
+		Code:      9,
+		Message:   "Vin operation amount value must be negative.",
+		Retriable: false,
+	}
+
+	InvalidCoinChangeError = &types.Error{
+		Code:      10,
+		Message:   "Invalid CoinChange Error.",
+		Retriable: false,
+	}
+
+	InvalidVoutOperationAmountValueError = &types.Error{
+		Code:      11,
+		Message:   "Vout operation amount value must be positive.",
+		Retriable: false,
+	}
+
+	NotSupportMultisigAllLockError = &types.Error{
+		Code:      12,
+		Message:   "Don't support sent to multisig all lock.",
+		Retriable: false,
+	}
+
+	LessThanMinCapacityError = &types.Error{
+		Code:      13,
+		Message:   fmt.Sprintf("Transfer amount must greater than %d CKB", MinCapacity/int64(math.Pow10(8))),
+		Retriable: false,
+	}
+
+	CapacityNotEnoughError = &types.Error{
+		Code:      14,
+		Message:   "Capacity not enough.",
 		Retriable: false,
 	}
 

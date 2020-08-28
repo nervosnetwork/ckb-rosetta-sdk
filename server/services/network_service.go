@@ -52,6 +52,9 @@ func (s *NetworkAPIService) NetworkStatus(
 		return nil, RpcError
 	}
 	nodeHeader, err := s.client.GetHeaderByNumber(context.Background(), header.BlockNumber)
+	if err != nil {
+		return nil, RpcError
+	}
 
 	result := &types.NetworkStatusResponse{
 		CurrentBlockIdentifier: &types.BlockIdentifier{
@@ -103,6 +106,16 @@ func (s *NetworkAPIService) NetworkOptions(
 				RpcError,
 				AddressParseError,
 				SubmitError,
+				ServerError,
+				UnsupportedCurveTypeError,
+				MissingVinOperationsError,
+				MissingVoutOperationsError,
+				InvalidVinOperationAmountValueError,
+				InvalidCoinChangeError,
+				InvalidVoutOperationAmountValueError,
+				NotSupportMultisigAllLockError,
+				LessThanMinCapacityError,
+				CapacityNotEnoughError,
 			},
 		},
 	}, nil
