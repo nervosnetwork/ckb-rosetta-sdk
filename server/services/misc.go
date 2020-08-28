@@ -50,6 +50,13 @@ var (
 		Decimals: 8,
 	}
 
+	SupportedOperationTypes = []string{
+		"Vin",
+		"Vout",
+		"Fee",
+		"Reward",
+	}
+
 	MinCapacity int64 = 6100000000
 )
 

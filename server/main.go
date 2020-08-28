@@ -62,12 +62,12 @@ func main() {
 		Network:    c.Network,
 	}
 
-	asserter, err := asserter.NewServer([]string{"Transfer", "Reward"}, false, []*types.NetworkIdentifier{network})
+	serverAsserter, err := asserter.NewServer(services.SupportedOperationTypes, false, []*types.NetworkIdentifier{network})
 	if err != nil {
 		log.Fatalf("initial server error: %v", err)
 	}
 
-	router := NewBlockchainRouter(network, asserter, client)
+	router := NewBlockchainRouter(network, serverAsserter, client)
 	log.Printf("Listening on port %d\n", c.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", c.Port), router))
 }
