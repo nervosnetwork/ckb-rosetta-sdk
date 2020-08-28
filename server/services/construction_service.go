@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"strconv"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -323,77 +322,22 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	var input int64
-	var output int64
-	vinOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Vin"
-	})
-	voutOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Vout"
-	})
-
-	if len(vinOperations) == 0 {
-		return nil, MissingVinOperationsError
+	input, err := validateVinOperations(request)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, operation := range vinOperations {
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount >= 0 {
-			return nil, InvalidVinOperationAmountValueError
-		}
-		err = asserter.CoinChange(operation.CoinChange)
-		if err != nil {
-			return nil, InvalidCoinChangeError
-		}
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil {
-			return nil, AddressParseError
-		}
-		// do not support send to multisig all lock
-		if isBlake160MultisigAllLock(addr) {
-			return nil, NotSupportMultisigAllLockError
-		}
-
-		input += -amount
+	output, err := validateVoutOperations(request)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(voutOperations) == 0 {
-		return nil, MissingVoutOperationsError
-	}
-
-	for _, operation := range voutOperations {
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount <= 0 {
-			return nil, InvalidVoutOperationAmountValueError
-		}
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil {
-			return nil, AddressParseError
-		}
-		if isBlake160SighashAllLock(addr) {
-			if amount < MinCapacity {
-				return nil, LessThanMinCapacityError
-			}
-		}
-
-		output += amount
-	}
-
-	if input <= output {
-		return nil, CapacityNotEnoughError
+	err = validateCapacity(input, output)
+	if err != nil {
+		return nil, err
 	}
 
 	return &types.ConstructionPreprocessResponse{}, nil
-}
-
-func isBlake160SighashAllLock(addr *address.ParsedAddress) bool {
-	return addr.Script.HashType == ckbTypes.HashTypeType &&
-		addr.Script.CodeHash.String() == "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
-}
-
-func isBlake160MultisigAllLock(addr *address.ParsedAddress) bool {
-	return addr.Script.HashType == ckbTypes.HashTypeType &&
-		addr.Script.CodeHash.String() == "0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8"
 }
 
 // ConstructionSubmit implements the /construction/submit endpoint.
@@ -424,14 +368,4 @@ func (s *ConstructionAPIService) ConstructionSubmit(
 			Hash: hash.String(),
 		},
 	}, nil
-}
-
-func operationFilter(arr []*types.Operation, cond func(*types.Operation) bool) []*types.Operation {
-	var result []*types.Operation
-	for i := range arr {
-		if cond(arr[i]) {
-			result = append(result, arr[i])
-		}
-	}
-	return result
 }
