@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"strconv"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -17,7 +18,7 @@ import (
 	"github.com/ququzone/ckb-sdk-go/utils"
 )
 
-// ConstructionAPIService implements the server.ConstructionAPIServicer interface.
+// ConstructionAPIService implements the server.ConstructionAPIService interface.
 type ConstructionAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
@@ -322,66 +323,77 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	input := int64(0)
-	output := int64(0)
-	for _, operation := range request.Operations {
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
-			addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
-			return nil, &types.Error{
-				Code:      7,
-				Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
-				Retriable: true,
-			}
-		}
+	var input int64
+	var output int64
+	vinOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+		return operation.Type == "Vin"
+	})
+	voutOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+		return operation.Type == "Vout"
+	})
 
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount == 0 {
-			return nil, &types.Error{
-				Code:      8,
-				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
-				Retriable: true,
-			}
-		}
-		if amount > 0 {
-			if amount < MinCapacity {
-				return nil, &types.Error{
-					Code:      9,
-					Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
-					Retriable: true,
-				}
-			}
-			output += amount
-		} else {
-			amount = -amount
-			capacity, err := s.client.GetCellsCapacity(context.Background(), &indexer.SearchKey{
-				Script:     addr.Script,
-				ScriptType: indexer.ScriptTypeLock,
-			})
-			if err != nil {
-				return nil, RpcError
-			}
-			if uint64(amount) > capacity.Capacity {
-				return nil, &types.Error{
-					Code:      10,
-					Message:   fmt.Sprintf("insufficient balance: %s", operation.Amount.Value),
-					Retriable: true,
-				}
-			}
-
-			input += amount
-		}
+	if len(vinOperations) == 0 {
+		return nil, MissingVinOperationsError
 	}
 
-	if output >= input {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("capacity overflow"),
-			Retriable: true,
+	for _, operation := range vinOperations {
+		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
+		if err != nil || amount >= 0 {
+			return nil, InvalidVinOperationAmountValueError
 		}
+		err = asserter.CoinChange(operation.CoinChange)
+		if err != nil {
+			return nil, InvalidCoinChangeError
+		}
+		addr, err := address.Parse(operation.Account.Address)
+		if err != nil {
+			return nil, AddressParseError
+		}
+		// do not support send to multisig all lock
+		if isBlake160MultisigAllLock(addr) {
+			return nil, NotSupportMultisigAllLockError
+		}
+
+		input += -amount
+	}
+
+	if len(voutOperations) == 0 {
+		return nil, MissingVoutOperationsError
+	}
+
+	for _, operation := range voutOperations {
+		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
+		if err != nil || amount <= 0 {
+			return nil, InvalidVoutOperationAmountValueError
+		}
+		addr, err := address.Parse(operation.Account.Address)
+		if err != nil {
+			return nil, AddressParseError
+		}
+		if isBlake160SighashAllLock(addr) {
+			if amount < MinCapacity {
+				return nil, LessThanMinCapacityError
+			}
+		}
+
+		output += amount
+	}
+
+	if input <= output {
+		return nil, CapacityNotEnoughError
 	}
 
 	return &types.ConstructionPreprocessResponse{}, nil
+}
+
+func isBlake160SighashAllLock(addr *address.ParsedAddress) bool {
+	return addr.Script.HashType == ckbTypes.HashTypeType &&
+		addr.Script.CodeHash.String() == "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
+}
+
+func isBlake160MultisigAllLock(addr *address.ParsedAddress) bool {
+	return addr.Script.HashType == ckbTypes.HashTypeType &&
+		addr.Script.CodeHash.String() == "0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8"
 }
 
 // ConstructionSubmit implements the /construction/submit endpoint.
@@ -412,4 +424,14 @@ func (s *ConstructionAPIService) ConstructionSubmit(
 			Hash: hash.String(),
 		},
 	}, nil
+}
+
+func operationFilter(arr []*types.Operation, cond func(*types.Operation) bool) []*types.Operation {
+	var result []*types.Operation
+	for i := range arr {
+		if cond(arr[i]) {
+			result = append(result, arr[i])
+		}
+	}
+	return result
 }
