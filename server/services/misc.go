@@ -95,6 +95,12 @@ var (
 		Retriable: false,
 	}
 
+	CoinIdentifierInvalidError = &types.Error{
+		Code:      15,
+		Message:   "Coin identifier is invalid.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -107,7 +113,24 @@ var (
 		"Reward",
 	}
 
-	MinCapacity int64 = 6100000000
+	MinCapacity   int64 = 6100000000
+	AllErrorTypes       = []*types.Error{
+		NoImplementError,
+		RpcError,
+		AddressParseError,
+		SubmitError,
+		ServerError,
+		UnsupportedCurveTypeError,
+		MissingInputOperationsError,
+		MissingOutputOperationsError,
+		InvalidInputOperationAmountValueError,
+		InvalidCoinChangeError,
+		InvalidOutputOperationAmountValueError,
+		NotSupportMultisigAllLockError,
+		LessThanMinCapacityError,
+		CapacityNotEnoughError,
+		CoinIdentifierInvalidError,
+	}
 )
 
 func GenerateAddress(network *types.NetworkIdentifier, script *typesCKB.Script) string {

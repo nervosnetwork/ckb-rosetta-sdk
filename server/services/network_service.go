@@ -101,22 +101,7 @@ func (s *NetworkAPIService) NetworkOptions(
 				},
 			},
 			OperationTypes: SupportedOperationTypes,
-			Errors: []*types.Error{
-				NoImplementError,
-				RpcError,
-				AddressParseError,
-				SubmitError,
-				ServerError,
-				UnsupportedCurveTypeError,
-				MissingInputOperationsError,
-				MissingOutputOperationsError,
-				InvalidInputOperationAmountValueError,
-				InvalidCoinChangeError,
-				InvalidOutputOperationAmountValueError,
-				NotSupportMultisigAllLockError,
-				LessThanMinCapacityError,
-				CapacityNotEnoughError,
-			},
+			Errors:         AllErrorTypes,
 		},
 	}, nil
 }
