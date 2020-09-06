@@ -6,8 +6,8 @@ import (
 	"math"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-sdk-go/address"
-	typesCKB "github.com/ququzone/ckb-sdk-go/types"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
+	typesCKB "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
 var (
@@ -98,6 +98,12 @@ var (
 	CoinIdentifierInvalidError = &types.Error{
 		Code:      15,
 		Message:   "Coin identifier is invalid.",
+		Retriable: false,
+	}
+
+	MissingOptionError = &types.Error{
+		Code:      16,
+		Message:   "Must set option in ConstructionMetadataRequest.",
 		Retriable: false,
 	}
 

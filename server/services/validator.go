@@ -3,7 +3,7 @@ package services
 import (
 	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-sdk-go/address"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
 	"strconv"
 )
 

@@ -6,8 +6,8 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
-	typesCKB "github.com/ququzone/ckb-sdk-go/types"
+	typesCKB "github.com/nervosnetwork/ckb-sdk-go/types"
+	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 )
 
 // BlockAPIService implements the server.BlockAPIServicer interface.

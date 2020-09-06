@@ -6,9 +6,9 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/indexer"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
-	"github.com/ququzone/ckb-sdk-go/address"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
+	"github.com/shaojunda/ckb-rich-sdk-go/indexer"
+	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 )
 
 // AccountAPIService implements the server.AccountAPIServicer interface.

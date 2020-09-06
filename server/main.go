@@ -8,7 +8,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
+	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/services"

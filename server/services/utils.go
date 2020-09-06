@@ -3,9 +3,9 @@ package services
 import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ququzone/ckb-sdk-go/address"
-	ckbTransaction "github.com/ququzone/ckb-sdk-go/transaction"
-	ckbTypes "github.com/ququzone/ckb-sdk-go/types"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
+	ckbTransaction "github.com/nervosnetwork/ckb-sdk-go/transaction"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"strconv"
 	"strings"
 )

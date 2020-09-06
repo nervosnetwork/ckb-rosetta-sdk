@@ -5,7 +5,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
+	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 )
 
 // NetworkAPIService implements the server.NetworkAPIService interface.
