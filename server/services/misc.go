@@ -107,6 +107,12 @@ var (
 		Retriable: false,
 	}
 
+	LiveCellMetadataHasDeadCellsError = &types.Error{
+		Code:      17,
+		Message:   "Coin identifier has dead cells.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -136,6 +142,7 @@ var (
 		LessThanMinCapacityError,
 		CapacityNotEnoughError,
 		CoinIdentifierInvalidError,
+		LiveCellMetadataHasDeadCellsError,
 	}
 )
 

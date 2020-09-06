@@ -2,19 +2,20 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strconv"
-
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/indexer"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
-	"github.com/ququzone/ckb-sdk-go/address"
-	"github.com/ququzone/ckb-sdk-go/crypto/blake2b"
-	ckbRpc "github.com/ququzone/ckb-sdk-go/rpc"
-	ckbTransaction "github.com/ququzone/ckb-sdk-go/transaction"
-	ckbTypes "github.com/ququzone/ckb-sdk-go/types"
-	"github.com/ququzone/ckb-sdk-go/utils"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
+	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
+	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
+	ckbTransaction "github.com/nervosnetwork/ckb-sdk-go/transaction"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
+	"github.com/nervosnetwork/ckb-sdk-go/utils"
+	"github.com/shaojunda/ckb-rich-sdk-go/indexer"
+	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
+	"log"
+	"strconv"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIService interface.
@@ -51,14 +52,14 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 		return nil, err
 	}
 
-	outPointsOption, err := generateInputOutPointsOption(request)
+	coinIdentifiersOption, err := generateCoinIdentifiersOption(request)
 	if err != nil {
 		return nil, err
 	}
 	response := &types.ConstructionPreprocessResponse{
-		Options: make(map[string]interface{}),
+		Options: map[string]interface{}{},
 	}
-	response.Options["outPoints"] = outPointsOption
+	response.Options["outPoints"] = coinIdentifiersOption
 
 	return response, nil
 }
@@ -68,9 +69,20 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	ctx context.Context,
 	request *types.ConstructionMetadataRequest,
 ) (*types.ConstructionMetadataResponse, *types.Error) {
-	// TODO use batchRequest get liveCells, if exists unknown cell return error
+	if request.Options == nil || request.Options["outPoints"] == nil {
+		return nil, MissingOptionError
+	}
+	cellInfos, err := fetchLiveCells(ctx, request, s)
+	if err != nil {
+		return nil, err
+	}
+	encodedCellInfos, encodeErr := json.Marshal(cellInfos)
+	if encodeErr != nil {
+		log.Fatal(encodeErr)
+		return nil, ServerError
+	}
 	return &types.ConstructionMetadataResponse{
-		Metadata: map[string]interface{}{},
+		Metadata: map[string]interface{}{"inputs": encodedCellInfos},
 	}, nil
 }
 
