@@ -7,26 +7,26 @@ import (
 	"strconv"
 )
 
-func validateCapacity(input int64, output int64) *types.Error {
-	if input <= output {
+func validateCapacity(inputTotalAmount int64, outputTotalAmount int64) *types.Error {
+	if inputTotalAmount <= outputTotalAmount {
 		return CapacityNotEnoughError
 	}
 	return nil
 }
 
-func validateVoutOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
-	var output int64
-	voutOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Vout"
+func validateOutputOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
+	var outputTotalAmount int64
+	outputOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+		return operation.Type == "Output"
 	})
-	if len(voutOperations) == 0 {
-		return 0, MissingVoutOperationsError
+	if len(outputOperations) == 0 {
+		return 0, MissingOutputOperationsError
 	}
 
-	for _, operation := range voutOperations {
+	for _, operation := range outputOperations {
 		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
 		if err != nil || amount <= 0 {
-			return 0, InvalidVoutOperationAmountValueError
+			return 0, InvalidOutputOperationAmountValueError
 		}
 		addr, err := address.Parse(operation.Account.Address)
 		if err != nil {
@@ -38,25 +38,25 @@ func validateVoutOperations(request *types.ConstructionPreprocessRequest) (int64
 			}
 		}
 
-		output += amount
+		outputTotalAmount += amount
 	}
-	return output, nil
+	return outputTotalAmount, nil
 }
 
-func validateVinOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
-	var input int64
-	vinOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Vin"
+func validateInputOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
+	var inputTotalAmount int64
+	inputOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+		return operation.Type == "Input"
 	})
 
-	if len(vinOperations) == 0 {
-		return 0, MissingVinOperationsError
+	if len(inputOperations) == 0 {
+		return 0, MissingInputOperationsError
 	}
 
-	for _, operation := range vinOperations {
+	for _, operation := range inputOperations {
 		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
 		if err != nil || amount >= 0 {
-			return 0, InvalidVinOperationAmountValueError
+			return 0, InvalidInputOperationAmountValueError
 		}
 		err = asserter.CoinChange(operation.CoinChange)
 		if err != nil {
@@ -71,7 +71,7 @@ func validateVinOperations(request *types.ConstructionPreprocessRequest) (int64,
 			return 0, NotSupportMultisigAllLockError
 		}
 
-		input += -amount
+		inputTotalAmount += -amount
 	}
-	return input, nil
+	return inputTotalAmount, nil
 }

@@ -47,21 +47,21 @@ var (
 		Retriable: false,
 	}
 
-	MissingVinOperationsError = &types.Error{
+	MissingInputOperationsError = &types.Error{
 		Code:      7,
-		Message:   "Must have Vin type operations.",
+		Message:   "Must have Input type operations.",
 		Retriable: false,
 	}
 
-	MissingVoutOperationsError = &types.Error{
+	MissingOutputOperationsError = &types.Error{
 		Code:      8,
-		Message:   "Must have Vout type operations.",
+		Message:   "Must have Output type operations.",
 		Retriable: false,
 	}
 
-	InvalidVinOperationAmountValueError = &types.Error{
+	InvalidInputOperationAmountValueError = &types.Error{
 		Code:      9,
-		Message:   "Vin operation amount value must be negative.",
+		Message:   "Input operation amount value must be negative.",
 		Retriable: false,
 	}
 
@@ -71,9 +71,9 @@ var (
 		Retriable: false,
 	}
 
-	InvalidVoutOperationAmountValueError = &types.Error{
+	InvalidOutputOperationAmountValueError = &types.Error{
 		Code:      11,
-		Message:   "Vout operation amount value must be positive.",
+		Message:   "Input operation amount value must be positive.",
 		Retriable: false,
 	}
 
@@ -101,8 +101,8 @@ var (
 	}
 
 	SupportedOperationTypes = []string{
-		"Vin",
-		"Vout",
+		"Input",
+		"Output",
 		"Fee",
 		"Reward",
 	}

@@ -36,17 +36,17 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	input, err := validateVinOperations(request)
+	inputTotalAmount, err := validateInputOperations(request)
 	if err != nil {
 		return nil, err
 	}
 
-	output, err := validateVoutOperations(request)
+	outputTotalAmount, err := validateOutputOperations(request)
 	if err != nil {
 		return nil, err
 	}
 
-	err = validateCapacity(input, output)
+	err = validateCapacity(inputTotalAmount, outputTotalAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +56,10 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 
 // ConstructionMetadata implements the /construction/metadata endpoint.
 func (s *ConstructionAPIService) ConstructionMetadata(
-	context.Context,
-	*types.ConstructionMetadataRequest,
+	ctx context.Context,
+	request *types.ConstructionMetadataRequest,
 ) (*types.ConstructionMetadataResponse, *types.Error) {
+	// TODO use batchRequest get liveCells, if exists unknown cell return error
 	return &types.ConstructionMetadataResponse{
 		Metadata: map[string]interface{}{},
 	}, nil
