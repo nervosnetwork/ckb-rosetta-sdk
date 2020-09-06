@@ -51,7 +51,16 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 		return nil, err
 	}
 
-	return &types.ConstructionPreprocessResponse{}, nil
+	outPointsOption, err := generateInputOutPointsOption(request)
+	if err != nil {
+		return nil, err
+	}
+	response := &types.ConstructionPreprocessResponse{
+		Options: make(map[string]interface{}),
+	}
+	response.Options["outPoints"] = outPointsOption
+
+	return response, nil
 }
 
 // ConstructionMetadata implements the /construction/metadata endpoint.
