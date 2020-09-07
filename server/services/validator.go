@@ -14,9 +14,9 @@ func validateCapacity(inputTotalAmount int64, outputTotalAmount int64) *types.Er
 	return nil
 }
 
-func validateOutputOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
+func validateOutputOperations(operations []*types.Operation) (int64, *types.Error) {
 	var outputTotalAmount int64
-	outputOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+	outputOperations := operationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Output"
 	})
 	if len(outputOperations) == 0 {
@@ -43,9 +43,9 @@ func validateOutputOperations(request *types.ConstructionPreprocessRequest) (int
 	return outputTotalAmount, nil
 }
 
-func validateInputOperations(request *types.ConstructionPreprocessRequest) (int64, *types.Error) {
+func validateInputOperations(operations []*types.Operation) (int64, *types.Error) {
 	var inputTotalAmount int64
-	inputOperations := operationFilter(request.Operations, func(operation *types.Operation) bool {
+	inputOperations := operationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Input"
 	})
 

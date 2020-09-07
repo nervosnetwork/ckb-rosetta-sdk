@@ -37,12 +37,12 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	inputTotalAmount, err := validateInputOperations(request)
+	inputTotalAmount, err := validateInputOperations(request.Operations)
 	if err != nil {
 		return nil, err
 	}
 
-	outputTotalAmount, err := validateOutputOperations(request)
+	outputTotalAmount, err := validateOutputOperations(request.Operations)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +91,20 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	ctx context.Context,
 	request *types.ConstructionPayloadsRequest,
 ) (*types.ConstructionPayloadsResponse, *types.Error) {
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	validateErr = validateCapacity(inputTotalAmount, outputTotalAmount)
+	if validateErr != nil {
+		return nil, validateErr
+	}
 
 	systemScripts, err := utils.NewSystemScripts(s.client)
 	if err != nil {
