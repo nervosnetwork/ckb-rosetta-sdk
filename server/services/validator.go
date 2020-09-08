@@ -16,7 +16,7 @@ func validateCapacity(inputTotalAmount int64, outputTotalAmount int64) *types.Er
 
 func validateOutputOperations(operations []*types.Operation) (int64, *types.Error) {
 	var outputTotalAmount int64
-	outputOperations := operationFilter(operations, func(operation *types.Operation) bool {
+	outputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Output"
 	})
 	if len(outputOperations) == 0 {
@@ -45,7 +45,7 @@ func validateOutputOperations(operations []*types.Operation) (int64, *types.Erro
 
 func validateInputOperations(operations []*types.Operation) (int64, *types.Error) {
 	var inputTotalAmount int64
-	inputOperations := operationFilter(operations, func(operation *types.Operation) bool {
+	inputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Input"
 	})
 
