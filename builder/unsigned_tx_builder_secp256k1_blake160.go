@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/services"
@@ -40,7 +42,20 @@ func (b UnsignedTxBuilderSecp256k1) BuildCellDeps() []ckbTypes.CellDep {
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildHeaderDeps() []ckbTypes.Hash {
-	panic("implement me")
+	mHeaderDeps, ok := b.Metadata["header_deps"]
+	if !ok || mHeaderDeps == nil {
+		return []ckbTypes.Hash{}
+	}
+	decodedHeaderDeps, err := base64.StdEncoding.DecodeString(mHeaderDeps.(string))
+	if err != nil {
+		return []ckbTypes.Hash{}
+	}
+	var headerDeps []ckbTypes.Hash
+	err = json.Unmarshal(decodedHeaderDeps, &headerDeps)
+	if err != nil {
+		return []ckbTypes.Hash{}
+	}
+	return headerDeps
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildOutputs() []ckbTypes.CellOutput {
