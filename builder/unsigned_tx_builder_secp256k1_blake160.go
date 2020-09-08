@@ -3,6 +3,7 @@ package builder
 import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/services"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"strconv"
 )
@@ -30,7 +31,12 @@ func (b UnsignedTxBuilderSecp256k1) BuildVersion() hexutil.Uint {
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildCellDeps() []ckbTypes.CellDep {
-	panic("implement me")
+	var cellDepArr []ckbTypes.CellDep
+	cellDeps, _ := services.ValidateCellDeps(b.Operations)
+	for _, cellDep := range cellDeps {
+		cellDepArr = append(cellDepArr, cellDep)
+	}
+	return cellDepArr
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildHeaderDeps() []ckbTypes.Hash {
