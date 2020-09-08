@@ -1,9 +1,13 @@
 package services
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"strconv"
 )
 
@@ -74,4 +78,76 @@ func validateInputOperations(operations []*types.Operation) (int64, *types.Error
 		inputTotalAmount += -amount
 	}
 	return inputTotalAmount, nil
+}
+
+func ValidateCellDeps(operations []*types.Operation) (map[string]ckbTypes.CellDep, *types.Error) {
+	cellDeps := make(map[string]ckbTypes.CellDep)
+	err := validateCellDepsOnInputOperation(operations, cellDeps)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateCellDepsOnOutputOperation(operations, cellDeps)
+	if err != nil {
+		return nil, err
+	}
+	return cellDeps, nil
+}
+
+func validateCellDepsOnOutputOperation(operations []*types.Operation, cellDeps map[string]ckbTypes.CellDep) *types.Error {
+	outputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
+		return operation.Type == "Output"
+	})
+	for _, operation := range outputOperations {
+		if mCellDep, ok := operation.Metadata["cell_dep"]; ok {
+			decodedCellDep, err := base64.StdEncoding.DecodeString(mCellDep.(string))
+			if err != nil {
+				return InvalidCellDepError
+			}
+			var cellDep ckbTypes.CellDep
+			err = json.Unmarshal(decodedCellDep, &cellDep)
+			if err != nil {
+				return InvalidCellDepError
+			}
+			key := fmt.Sprintf("%s:%d", cellDep.OutPoint.TxHash, cellDep.OutPoint.Index)
+			if _, ok := cellDeps[key]; !ok {
+				cellDeps[key] = cellDep
+			}
+		}
+	}
+	return nil
+}
+
+func validateCellDepsOnInputOperation(operations []*types.Operation, cellDeps map[string]ckbTypes.CellDep) *types.Error {
+	inputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
+		return operation.Type == "Input"
+	})
+	for _, operation := range inputOperations {
+		mCellDep, ok := operation.Metadata["cell_dep"]
+		if !ok || mCellDep == nil {
+			return MissingCellDepsOnOperationError
+		}
+		decodedCellDep, err := base64.StdEncoding.DecodeString(mCellDep.(string))
+		if err != nil {
+			return InvalidCellDepError
+		}
+		var cellDep ckbTypes.CellDep
+		err = json.Unmarshal(decodedCellDep, &cellDep)
+		if err != nil {
+			return InvalidCellDepError
+		}
+		key := fmt.Sprintf("%s:%d", cellDep.OutPoint.TxHash, cellDep.OutPoint.Index)
+		if _, ok := cellDeps[key]; !ok {
+			cellDeps[key] = cellDep
+		}
+	}
+	return nil
+}
+
+func validateInputsMetadata(metadata map[string]interface{}) (string, *types.Error) {
+	inputs, ok := metadata["inputs"]
+	if !ok || inputs == nil {
+		return "", MissingInputsOnConstructionPayloadsRequestError
+	}
+	return inputs.(string), nil
 }
