@@ -52,6 +52,11 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 		return nil, err
 	}
 
+	_, err = ValidateCellDeps(request.Operations)
+	if err != nil {
+		return nil, err
+	}
+
 	coinIdentifiersOption, err := generateCoinIdentifiersOption(request)
 	if err != nil {
 		return nil, err
@@ -69,7 +74,7 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	ctx context.Context,
 	request *types.ConstructionMetadataRequest,
 ) (*types.ConstructionMetadataResponse, *types.Error) {
-	if request.Options == nil || request.Options["outPoints"] == nil {
+	if request.Options == nil || request.Options["out_points"] == nil {
 		return nil, MissingOptionError
 	}
 	cellInfos, err := fetchLiveCells(ctx, request, s)
@@ -102,6 +107,11 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	}
 
 	validateErr = validateCapacity(inputTotalAmount, outputTotalAmount)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	_, validateErr = ValidateCellDeps(request.Operations)
 	if validateErr != nil {
 		return nil, validateErr
 	}

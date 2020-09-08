@@ -125,6 +125,18 @@ var (
 		Retriable: false,
 	}
 
+	MissingCellDepsOnOperationError = &types.Error{
+		Code:      20,
+		Message:   "Missing cell deps on operation.",
+		Retriable: false,
+	}
+
+	InvalidCellDepError = &types.Error{
+		Code:      21,
+		Message:   "Invalid Cell dep error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -155,6 +167,9 @@ var (
 		CapacityNotEnoughError,
 		CoinIdentifierInvalidError,
 		LiveCellMetadataHasDeadCellsError,
+		MissingInputsOnConstructionPayloadsRequestError,
+		MissingCellDepsOnOperationError,
+		InvalidCellDepError,
 	}
 )
 
