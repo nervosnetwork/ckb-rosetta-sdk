@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
 	ckbTransaction "github.com/nervosnetwork/ckb-sdk-go/transaction"
@@ -69,4 +71,28 @@ func fetchLiveCells(ctx context.Context, request *types.ConstructionMetadataRequ
 		cellInfos = append(cellInfos, ckbTypes.CellInfo{Output: cell.Output, Data: cell.Data})
 	}
 	return cellInfos, nil
+}
+
+func validateInputsMetadata(metadata map[string]interface{}) (string, *types.Error) {
+	inputs, ok := metadata["inputs"]
+	if !ok || inputs == nil {
+		return "", MissingInputsOnConstructionPayloadsRequestError
+	}
+	return inputs.(string), nil
+}
+
+func parseInputCellsFromMetadata(inputs string) ([]ckbTypes.CellInfo, *types.Error) {
+	if inputs == "" {
+
+	}
+	var inputCells []ckbTypes.CellInfo
+	decodedInputs, err := base64.StdEncoding.DecodeString(inputs)
+	if err != nil {
+		return nil, InvalidLiveCellsError
+	}
+	err = json.Unmarshal(decodedInputs, &inputCells)
+	if err != nil {
+		return nil, InvalidLiveCellsError
+	}
+	return inputCells, nil
 }

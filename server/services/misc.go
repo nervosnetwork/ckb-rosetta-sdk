@@ -113,6 +113,18 @@ var (
 		Retriable: false,
 	}
 
+	InvalidLiveCellsError = &types.Error{
+		Code:      18,
+		Message:   "Live cell decoding error.",
+		Retriable: false,
+	}
+
+	MissingInputsOnConstructionPayloadsRequestError = &types.Error{
+		Code:      19,
+		Message:   "Missing inputs on ConstructionPayloadsRequest.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,

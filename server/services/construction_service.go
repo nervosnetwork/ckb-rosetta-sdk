@@ -106,6 +106,12 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		return nil, validateErr
 	}
 
+	inputs, validateErr := validateInputsMetadata(request.Metadata)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	_, validateErr = parseInputCellsFromMetadata(inputs)
+
 	systemScripts, err := utils.NewSystemScripts(s.client)
 	if err != nil {
 		return nil, ServerError
