@@ -32,7 +32,7 @@ func isBlake160MultisigAllLock(addr *address.ParsedAddress) bool {
 		addr.Script.CodeHash.String() == ckbTransaction.SECP256K1_BLAKE160_MULTISIG_ALL_TYPE_HASH
 }
 
-func generateCoinIdentifiersOption(request *types.ConstructionPreprocessRequest) ([]string, *types.Error) {
+func generateCoinIdentifiersOption(request *types.ConstructionPreprocessRequest) ([]byte, *types.Error) {
 	inputOperations := OperationFilter(request.Operations, func(operation *types.Operation) bool {
 		return operation.Type == "Input"
 	})
@@ -40,25 +40,35 @@ func generateCoinIdentifiersOption(request *types.ConstructionPreprocessRequest)
 	for _, operation := range inputOperations {
 		identifiers = append(identifiers, operation.CoinChange.CoinIdentifier.Identifier)
 	}
-	return identifiers, nil
+	jsonIdentifiers, err := json.Marshal(identifiers)
+	if err != nil {
+		return nil, CoinIdentifierInvalidError
+	}
+	return jsonIdentifiers, nil
 }
 
-func fetchLiveCells(ctx context.Context, request *types.ConstructionMetadataRequest, s *ConstructionAPIService) ([]ckbTypes.CellInfo, *types.Error) {
+func fetchLiveCells(ctx context.Context, options map[string]interface{}, s *ConstructionAPIService) ([]ckbTypes.CellInfo, *types.Error) {
 	var items []ckbTypes.BatchLiveCellItem
-	for _, option := range request.Options["out_points"].([]interface{}) {
-		identifier := strings.Split(option.(string), ":")
-		index, err := strconv.ParseUint(identifier[1], 10, 32)
-		if err != nil {
-			return nil, CoinIdentifierInvalidError
-		}
-		outPoint := ckbTypes.OutPoint{
-			TxHash: ckbTypes.HexToHash(identifier[0]),
-			Index:  uint(index),
-		}
+	strCoinIdentifier, ok := options["coin_identifiers"].(string)
+	if !ok {
+		return nil, MissingCoinIdentifiersError
+	}
+	decodedCoinIdentifiers, err := base64.StdEncoding.DecodeString(strCoinIdentifier)
+	var coinIdentifiers []string
+	err = json.Unmarshal(decodedCoinIdentifiers, &coinIdentifiers)
+	if err != nil {
+		return nil, CoinIdentifierInvalidError
+	}
+
+	outPoints, validateErr := generateOutPointFromCoinIdentifiers(coinIdentifiers)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	for _, outPoint := range outPoints {
 		items = append(items, ckbTypes.BatchLiveCellItem{OutPoint: outPoint, WithData: false})
 	}
 
-	err := s.client.BatchLiveCells(ctx, items)
+	err = s.client.BatchLiveCells(ctx, items)
 	if err != nil {
 		return nil, CoinIdentifierInvalidError
 	}
@@ -73,6 +83,24 @@ func fetchLiveCells(ctx context.Context, request *types.ConstructionMetadataRequ
 	return cellInfos, nil
 }
 
+func generateOutPointFromCoinIdentifiers(coinIdentifiers []string) ([]ckbTypes.OutPoint, *types.Error) {
+	var outPoints []ckbTypes.OutPoint
+	for _, option := range coinIdentifiers {
+		identifier := strings.Split(option, ":")
+		index, err := strconv.ParseUint(identifier[1], 10, 32)
+		if err != nil {
+			return nil, CoinIdentifierInvalidError
+		}
+		outPoint := ckbTypes.OutPoint{
+			TxHash: ckbTypes.HexToHash(identifier[0]),
+			Index:  uint(index),
+		}
+		outPoints = append(outPoints, outPoint)
+	}
+
+	return outPoints, nil
+}
+
 func parseInputCellsFromMetadata(inputs string) ([]ckbTypes.CellInfo, *types.Error) {
 	var inputCells []ckbTypes.CellInfo
 	decodedInputs, err := base64.StdEncoding.DecodeString(inputs)
@@ -84,4 +112,12 @@ func parseInputCellsFromMetadata(inputs string) ([]ckbTypes.CellInfo, *types.Err
 		return nil, InvalidLiveCellsError
 	}
 	return inputCells, nil
+}
+
+func parseSingingType(metadata map[string]interface{}) (string, *types.Error) {
+	strSingingType, ok := metadata["singing_type"].(string)
+	if !ok {
+		return "", MissingSigningTypeError
+	}
+	return strSingingType, nil
 }

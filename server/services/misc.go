@@ -85,7 +85,7 @@ var (
 
 	LessThanMinCapacityError = &types.Error{
 		Code:      13,
-		Message:   fmt.Sprintf("Transfer amount must greater than %d CKB", MinCapacity/int64(math.Pow10(8))),
+		Message:   fmt.Sprintf("Transfer amount must greater than %d CKB", MinCapacity/uint64(math.Pow10(8))),
 		Retriable: false,
 	}
 
@@ -149,6 +149,18 @@ var (
 		Retriable: false,
 	}
 
+	MissingSigningTypeError = &types.Error{
+		Code:      24,
+		Message:   "Missing signing type error.",
+		Retriable: false,
+	}
+
+	MissingCoinIdentifiersError = &types.Error{
+		Code:      25,
+		Message:   "Missing coin identifiers error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -161,8 +173,8 @@ var (
 		"Reward",
 	}
 
-	MinCapacity   int64 = 6100000000
-	AllErrorTypes       = []*types.Error{
+	MinCapacity   uint64 = 6100000000
+	AllErrorTypes        = []*types.Error{
 		NoImplementError,
 		RpcError,
 		AddressParseError,
@@ -184,6 +196,7 @@ var (
 		InvalidCellDepError,
 		InvalidTypeScriptError,
 		InvalidOutputDataError,
+		MissingCoinIdentifiersError,
 	}
 )
 

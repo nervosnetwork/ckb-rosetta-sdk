@@ -21,11 +21,10 @@ type UnsignedTxBuilderSecp256k1 struct {
 
 func (b UnsignedTxBuilderSecp256k1) BuildVersion() (hexutil.Uint, *types.Error) {
 	var defaultVersion uint
-	version, ok := b.Metadata["version"]
-	if !ok || version == nil {
+	strVersion, ok := b.Metadata["version"].(string)
+	if !ok {
 		return hexutil.Uint(defaultVersion), nil
 	}
-	strVersion := version.(string)
 	uVersion, err := strconv.ParseUint(strVersion, 10, 64)
 	if err != nil {
 		return hexutil.Uint(defaultVersion), nil
@@ -46,11 +45,11 @@ func (b UnsignedTxBuilderSecp256k1) BuildCellDeps() ([]ckbTypes.CellDep, *types.
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildHeaderDeps() ([]ckbTypes.Hash, *types.Error) {
-	mHeaderDeps, ok := b.Metadata["header_deps"]
-	if !ok || mHeaderDeps == nil {
+	strHeaderDeps, ok := b.Metadata["header_deps"].(string)
+	if !ok {
 		return []ckbTypes.Hash{}, nil
 	}
-	decodedHeaderDeps, err := base64.StdEncoding.DecodeString(mHeaderDeps.(string))
+	decodedHeaderDeps, err := base64.StdEncoding.DecodeString(strHeaderDeps)
 	if err != nil {
 		return []ckbTypes.Hash{}, nil
 	}
@@ -77,9 +76,9 @@ func (b UnsignedTxBuilderSecp256k1) BuildOutputs() ([]ckbTypes.CellOutput, *type
 			return nil, services.AddressParseError
 		}
 		var typeScript *ckbTypes.Script
-		mTypeScript, ok := operation.Metadata["type_script"]
-		if ok && mTypeScript != nil {
-			decodedTypeScript, err := base64.StdEncoding.DecodeString(mTypeScript.(string))
+		strTypeScript, ok := operation.Metadata["type_script"].(string)
+		if ok {
+			decodedTypeScript, err := base64.StdEncoding.DecodeString(strTypeScript)
 			if err != nil {
 				return nil, services.InvalidTypeScriptError
 			}
@@ -103,9 +102,9 @@ func (b UnsignedTxBuilderSecp256k1) BuildOutputsData() ([][]byte, *types.Error) 
 	})
 	var outputsData [][]byte
 	for _, operation := range outputOperations {
-		mOutputData, ok := operation.Metadata["output_data"]
-		if ok && mOutputData != nil {
-			decodedOutputData, err := base64.StdEncoding.DecodeString(mOutputData.(string))
+		strOutputData, ok := operation.Metadata["output_data"].(string)
+		if ok {
+			decodedOutputData, err := base64.StdEncoding.DecodeString(strOutputData)
 			if err != nil {
 				return nil, services.InvalidOutputDataError
 			}
