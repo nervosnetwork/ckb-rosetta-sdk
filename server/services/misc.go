@@ -143,6 +143,12 @@ var (
 		Retriable: false,
 	}
 
+	InvalidOutputDataError = &types.Error{
+		Code:      23,
+		Message:   "Invalid output data error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -177,6 +183,7 @@ var (
 		MissingCellDepsOnOperationError,
 		InvalidCellDepError,
 		InvalidTypeScriptError,
+		InvalidOutputDataError,
 	}
 )
 

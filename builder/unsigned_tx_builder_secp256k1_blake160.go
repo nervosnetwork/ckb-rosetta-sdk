@@ -98,7 +98,29 @@ func (b UnsignedTxBuilderSecp256k1) BuildOutputs() ([]ckbTypes.CellOutput, *type
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildOutputsData() ([][]byte, *types.Error) {
-	panic("implement me")
+	outputOperations := services.OperationFilter(b.Operations, func(operation *types.Operation) bool {
+		return operation.Type == "Output"
+	})
+	var outputsData [][]byte
+	for _, operation := range outputOperations {
+		mOutputData, ok := operation.Metadata["output_data"]
+		if ok && mOutputData != nil {
+			decodedOutputData, err := base64.StdEncoding.DecodeString(mOutputData.(string))
+			if err != nil {
+				return nil, services.InvalidOutputDataError
+			}
+			var outputData []byte
+			err = json.Unmarshal(decodedOutputData, &outputData)
+			if err != nil {
+				return nil, services.InvalidOutputDataError
+			}
+			outputsData = append(outputsData, outputData)
+		} else {
+			outputsData = append(outputsData, []byte{})
+		}
+	}
+
+	return outputsData, nil
 }
 
 func (b UnsignedTxBuilderSecp256k1) BuildWitnesses() ([][]byte, *types.Error) {
