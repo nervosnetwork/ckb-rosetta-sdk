@@ -11,15 +11,15 @@ import (
 	"strconv"
 )
 
-func validateCapacity(inputTotalAmount int64, outputTotalAmount int64) *types.Error {
+func validateCapacity(inputTotalAmount uint64, outputTotalAmount uint64) *types.Error {
 	if inputTotalAmount <= outputTotalAmount {
 		return CapacityNotEnoughError
 	}
 	return nil
 }
 
-func validateOutputOperations(operations []*types.Operation) (int64, *types.Error) {
-	var outputTotalAmount int64
+func validateOutputOperations(operations []*types.Operation) (uint64, *types.Error) {
+	var outputTotalAmount uint64
 	outputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Output"
 	})
@@ -28,8 +28,11 @@ func validateOutputOperations(operations []*types.Operation) (int64, *types.Erro
 	}
 
 	for _, operation := range outputOperations {
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount <= 0 {
+		if operation.Amount.Value[0:1] == "-" {
+			return 0, InvalidOutputOperationAmountValueError
+		}
+		amount, err := strconv.ParseUint(operation.Amount.Value, 10, 64)
+		if err != nil {
 			return 0, InvalidOutputOperationAmountValueError
 		}
 		addr, err := address.Parse(operation.Account.Address)
@@ -47,8 +50,8 @@ func validateOutputOperations(operations []*types.Operation) (int64, *types.Erro
 	return outputTotalAmount, nil
 }
 
-func validateInputOperations(operations []*types.Operation) (int64, *types.Error) {
-	var inputTotalAmount int64
+func validateInputOperations(operations []*types.Operation) (uint64, *types.Error) {
+	var inputTotalAmount uint64
 	inputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == "Input"
 	})
@@ -58,8 +61,8 @@ func validateInputOperations(operations []*types.Operation) (int64, *types.Error
 	}
 
 	for _, operation := range inputOperations {
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount >= 0 {
+		amount, err := strconv.ParseUint(operation.Amount.Value[1:], 10, 64)
+		if err != nil || operation.Amount.Value[0:1] != "-" {
 			return 0, InvalidInputOperationAmountValueError
 		}
 		err = asserter.CoinChange(operation.CoinChange)
@@ -75,7 +78,7 @@ func validateInputOperations(operations []*types.Operation) (int64, *types.Error
 			return 0, NotSupportMultisigAllLockError
 		}
 
-		inputTotalAmount += -amount
+		inputTotalAmount += amount
 	}
 	return inputTotalAmount, nil
 }
@@ -99,8 +102,11 @@ func validateCellDepsOnOutputOperation(operations []*types.Operation, cellDeps m
 		return operation.Type == "Output"
 	})
 	for _, operation := range outputOperations {
-		if mCellDep, ok := operation.Metadata["cell_dep"]; ok {
-			decodedCellDep, err := base64.StdEncoding.DecodeString(mCellDep.(string))
+		if strCellDep, ok := operation.Metadata["cell_dep"].(string); ok {
+			if !ok {
+				return InvalidCellDepError
+			}
+			decodedCellDep, err := base64.StdEncoding.DecodeString(strCellDep)
 			if err != nil {
 				return InvalidCellDepError
 			}
@@ -123,11 +129,11 @@ func validateCellDepsOnInputOperation(operations []*types.Operation, cellDeps ma
 		return operation.Type == "Input"
 	})
 	for _, operation := range inputOperations {
-		mCellDep, ok := operation.Metadata["cell_dep"]
-		if !ok || mCellDep == nil {
+		strCellDep, ok := operation.Metadata["cell_dep"].(string)
+		if !ok {
 			return MissingCellDepsOnOperationError
 		}
-		decodedCellDep, err := base64.StdEncoding.DecodeString(mCellDep.(string))
+		decodedCellDep, err := base64.StdEncoding.DecodeString(strCellDep)
 		if err != nil {
 			return InvalidCellDepError
 		}
@@ -144,10 +150,22 @@ func validateCellDepsOnInputOperation(operations []*types.Operation, cellDeps ma
 	return nil
 }
 
-func validateInputsMetadata(metadata map[string]interface{}) (string, *types.Error) {
-	inputs, ok := metadata["inputs"]
-	if !ok || inputs == nil {
-		return "", MissingInputsOnConstructionPayloadsRequestError
+func validateInputsMetadata(metadata map[string]interface{}, inputTotalAmount uint64) ([]ckbTypes.CellInfo, *types.Error) {
+	strInputs, ok := metadata["inputs"].(string)
+	if !ok {
+		return nil, MissingInputsOnConstructionPayloadsRequestError
 	}
-	return inputs.(string), nil
+	inputCells, err := parseInputCellsFromMetadata(strInputs)
+	if err != nil {
+		return nil, err
+	}
+	var inputTotalCapacity uint64
+	for _, inputCell := range inputCells {
+		inputTotalCapacity += inputCell.Output.Capacity
+	}
+	if inputTotalCapacity < inputTotalAmount {
+		return nil, CapacityNotEnoughError
+	}
+
+	return inputCells, nil
 }
