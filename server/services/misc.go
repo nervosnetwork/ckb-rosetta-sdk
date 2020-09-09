@@ -73,7 +73,7 @@ var (
 
 	InvalidOutputOperationAmountValueError = &types.Error{
 		Code:      11,
-		Message:   "Input operation amount value must be positive.",
+		Message:   "Output operation amount value must be positive.",
 		Retriable: false,
 	}
 
@@ -137,6 +137,12 @@ var (
 		Retriable: false,
 	}
 
+	InvalidTypeScriptError = &types.Error{
+		Code:      22,
+		Message:   "Invalid type script error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -170,6 +176,7 @@ var (
 		MissingInputsOnConstructionPayloadsRequestError,
 		MissingCellDepsOnOperationError,
 		InvalidCellDepError,
+		InvalidTypeScriptError,
 	}
 )
 
