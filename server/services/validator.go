@@ -169,3 +169,11 @@ func validateInputsMetadata(metadata map[string]interface{}, inputTotalAmount ui
 
 	return inputCells, nil
 }
+
+func validateSigningType(metadata map[string]interface{}) (string, *types.Error) {
+	singingType, ok := metadata["singing_type"].(string)
+	if !ok {
+		return "", MissingSigningTypeError
+	}
+	return singingType, nil
+}

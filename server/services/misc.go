@@ -197,6 +197,7 @@ var (
 		InvalidTypeScriptError,
 		InvalidOutputDataError,
 		MissingCoinIdentifiersError,
+		MissingSigningTypeError,
 	}
 )
 

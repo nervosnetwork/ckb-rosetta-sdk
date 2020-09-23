@@ -113,11 +113,3 @@ func parseInputCellsFromMetadata(inputs string) ([]ckbTypes.CellInfo, *types.Err
 	}
 	return inputCells, nil
 }
-
-func parseSingingType(metadata map[string]interface{}) (string, *types.Error) {
-	strSingingType, ok := metadata["singing_type"].(string)
-	if !ok {
-		return "", MissingSigningTypeError
-	}
-	return strSingingType, nil
-}
