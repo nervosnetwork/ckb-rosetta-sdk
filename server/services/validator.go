@@ -84,10 +84,12 @@ func validateInputOperations(operations []*types.Operation) (uint64, *types.Erro
 	return inputTotalAmount, nil
 }
 
-func validateSigningType(metadata map[string]interface{}) (string, *types.Error) {
-	singingType, ok := metadata["singing_type"].(string)
-	if !ok {
-		return "", MissingSigningTypeError
+func validateTxType(metadata map[string]interface{}) (string, *types.Error) {
+	var constructionMetadata ckb.ConstructionMetadata
+	err := types.UnmarshalMap(metadata, &constructionMetadata)
+	if err != nil {
+		return "", InvalidConstructionMetadataError
 	}
-	return singingType, nil
+
+	return constructionMetadata.TxType, nil
 }

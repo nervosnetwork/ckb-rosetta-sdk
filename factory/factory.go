@@ -22,14 +22,19 @@ func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(txType string) TxSizeEsti
 
 type TxSizeEstimatorInterface interface {
 	EstimatedTxSize(operations []*types.Operation) (uint64, error)
+	HeaderDepsSize() uint64
+	CellDepsSize() uint64
+	WitnessSize(int) uint64
+	OutputSize(*types.Operation) (uint64, error)
+	OutputDataSize(string) (uint64, error)
 }
 
 type TxSizeEstimator struct {
 	HeaderDepsSize func() uint64
 	CellDepsSize   func() uint64
-	WitnessSize    func(i int) uint64
-	OutputSize     func(operation *types.Operation) (uint64, error)
-	OutputDataSize func(data string) (uint64, error)
+	WitnessSize    func(int) uint64
+	OutputSize     func(*types.Operation) (uint64, error)
+	OutputDataSize func(string) (uint64, error)
 }
 
 func (tse *TxSizeEstimator) EstimatedTxSize(operations []*types.Operation) (uint64, error) {
