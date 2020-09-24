@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -47,42 +46,6 @@ func generateCoinIdentifiersOption(request *types.ConstructionPreprocessRequest)
 	return jsonIdentifiers, nil
 }
 
-func fetchLiveCells(ctx context.Context, options map[string]interface{}, s *ConstructionAPIService) ([]ckbTypes.CellInfo, *types.Error) {
-	var items []ckbTypes.BatchLiveCellItem
-	strCoinIdentifier, ok := options["coin_identifiers"].(string)
-	if !ok {
-		return nil, MissingCoinIdentifiersError
-	}
-	decodedCoinIdentifiers, err := base64.StdEncoding.DecodeString(strCoinIdentifier)
-	var coinIdentifiers []string
-	err = json.Unmarshal(decodedCoinIdentifiers, &coinIdentifiers)
-	if err != nil {
-		return nil, CoinIdentifierInvalidError
-	}
-
-	outPoints, validateErr := generateOutPointFromCoinIdentifiers(coinIdentifiers)
-	if validateErr != nil {
-		return nil, validateErr
-	}
-	for _, outPoint := range outPoints {
-		items = append(items, ckbTypes.BatchLiveCellItem{OutPoint: outPoint, WithData: false})
-	}
-
-	err = s.client.BatchLiveCells(ctx, items)
-	if err != nil {
-		return nil, CoinIdentifierInvalidError
-	}
-	var cellInfos []ckbTypes.CellInfo
-	for _, item := range items {
-		cell := item.Result.Cell
-		if item.Result.Status != "live" {
-			return nil, LiveCellMetadataHasDeadCellsError
-		}
-		cellInfos = append(cellInfos, ckbTypes.CellInfo{Output: cell.Output, Data: cell.Data})
-	}
-	return cellInfos, nil
-}
-
 func generateOutPointFromCoinIdentifiers(coinIdentifiers []string) ([]ckbTypes.OutPoint, *types.Error) {
 	var outPoints []ckbTypes.OutPoint
 	for _, option := range coinIdentifiers {
@@ -112,4 +75,18 @@ func parseInputCellsFromMetadata(inputs string) ([]ckbTypes.CellInfo, *types.Err
 		return nil, InvalidLiveCellsError
 	}
 	return inputCells, nil
+}
+
+func wrapErr(rErr *types.Error, err error) *types.Error {
+	newErr := &types.Error{
+		Code:    rErr.Code,
+		Message: rErr.Message,
+	}
+	if err != nil {
+		newErr.Details = map[string]interface{}{
+			"context": err.Error(),
+		}
+	}
+
+	return newErr
 }
