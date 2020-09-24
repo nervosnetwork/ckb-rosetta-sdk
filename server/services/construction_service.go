@@ -92,6 +92,17 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	if !SupportedTxTypes[options.TxType] {
 		return nil, wrapErr(UnsupportedTxType, fmt.Errorf("unsupported tx type: %s", options.TxType))
 	}
+	shannonsPerKB := float64(ckb.MinFeeRate)
+	if options.SuggestedFeeMultiplier != nil {
+		shannonsPerKB *= *options.SuggestedFeeMultiplier
+	}
+	shannonsPerB := shannonsPerKB / ckb.BytesInKb
+	estimatedFee := shannonsPerB * float64(options.EstimatedTxSize)
+	suggestedFee := &types.Amount{
+		Value:    fmt.Sprintf("%d", uint64(estimatedFee)),
+		Currency: CkbCurrency,
+	}
+
 	metadata, err := types.MarshalMap(&ckb.ConstructionMetadata{
 		TxType: options.TxType,
 	})
@@ -100,7 +111,8 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	}
 
 	return &types.ConstructionMetadataResponse{
-		Metadata: metadata,
+		Metadata:     metadata,
+		SuggestedFee: []*types.Amount{suggestedFee},
 	}, nil
 }
 

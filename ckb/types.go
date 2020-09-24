@@ -9,6 +9,8 @@ const (
 	HeaderDepSize            = 32
 	CellDepSize              = 37
 	SerializedOffsetByteSize = 4
+	BytesInKb                = 1000
+	MinFeeRate               = 1000 // shannons/KB
 	Secp256k1Tx              = "Secp256k1Tx"
 )
 
