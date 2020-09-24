@@ -2,19 +2,18 @@ package services
 
 import (
 	"encoding/json"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/nervosnetwork/ckb-sdk-go/types"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
 type outPoint struct {
-	TxHash types.Hash   `json:"tx_hash"`
-	Index  hexutil.Uint `json:"index"`
+	TxHash ckbTypes.Hash `json:"tx_hash"`
+	Index  hexutil.Uint  `json:"index"`
 }
 
 type cellDep struct {
-	OutPoint outPoint      `json:"out_point"`
-	DepType  types.DepType `json:"dep_type"`
+	OutPoint outPoint         `json:"out_point"`
+	DepType  ckbTypes.DepType `json:"dep_type"`
 }
 
 type cellInput struct {
@@ -23,9 +22,9 @@ type cellInput struct {
 }
 
 type script struct {
-	CodeHash types.Hash           `json:"code_hash"`
-	HashType types.ScriptHashType `json:"hash_type"`
-	Args     hexutil.Bytes        `json:"args"`
+	CodeHash ckbTypes.Hash           `json:"code_hash"`
+	HashType ckbTypes.ScriptHashType `json:"hash_type"`
+	Args     hexutil.Bytes           `json:"args"`
 }
 
 type cellOutput struct {
@@ -36,9 +35,9 @@ type cellOutput struct {
 
 type transaction struct {
 	Version     hexutil.Uint    `json:"version"`
-	Hash        types.Hash      `json:"hash"`
+	Hash        ckbTypes.Hash   `json:"hash"`
 	CellDeps    []cellDep       `json:"cell_deps"`
-	HeaderDeps  []types.Hash    `json:"header_deps"`
+	HeaderDeps  []ckbTypes.Hash `json:"header_deps"`
 	Inputs      []cellInput     `json:"inputs"`
 	Outputs     []cellOutput    `json:"outputs"`
 	OutputsData []hexutil.Bytes `json:"outputs_data"`
@@ -48,19 +47,19 @@ type transaction struct {
 type inTransaction struct {
 	Version     hexutil.Uint    `json:"version"`
 	CellDeps    []cellDep       `json:"cell_deps"`
-	HeaderDeps  []types.Hash    `json:"header_deps"`
+	HeaderDeps  []ckbTypes.Hash `json:"header_deps"`
 	Inputs      []cellInput     `json:"inputs"`
 	Outputs     []cellOutput    `json:"outputs"`
 	OutputsData []hexutil.Bytes `json:"outputs_data"`
 	Witnesses   []hexutil.Bytes `json:"witnesses"`
 }
 
-func ToTransaction(data string) (*types.Transaction, error) {
+func ToTransaction(data string) (*ckbTypes.Transaction, error) {
 	var tx transaction
 	if err := json.Unmarshal([]byte(data), &tx); err != nil {
 		return nil, err
 	}
-	return &types.Transaction{
+	return &ckbTypes.Transaction{
 		Version:     uint(tx.Version),
 		Hash:        tx.Hash,
 		CellDeps:    toCellDeps(tx.CellDeps),
@@ -80,20 +79,20 @@ func toBytesArray(bytes []hexutil.Bytes) [][]byte {
 	return result
 }
 
-func toOutputs(outputs []cellOutput) []*types.CellOutput {
-	result := make([]*types.CellOutput, len(outputs))
+func toOutputs(outputs []cellOutput) []*ckbTypes.CellOutput {
+	result := make([]*ckbTypes.CellOutput, len(outputs))
 	for i := 0; i < len(outputs); i++ {
 		output := outputs[i]
-		result[i] = &types.CellOutput{
+		result[i] = &ckbTypes.CellOutput{
 			Capacity: uint64(output.Capacity),
-			Lock: &types.Script{
+			Lock: &ckbTypes.Script{
 				CodeHash: output.Lock.CodeHash,
 				HashType: output.Lock.HashType,
 				Args:     output.Lock.Args,
 			},
 		}
 		if output.Type != nil {
-			result[i].Type = &types.Script{
+			result[i].Type = &ckbTypes.Script{
 				CodeHash: output.Type.CodeHash,
 				HashType: output.Type.HashType,
 				Args:     output.Type.Args,
@@ -103,13 +102,13 @@ func toOutputs(outputs []cellOutput) []*types.CellOutput {
 	return result
 }
 
-func toInputs(inputs []cellInput) []*types.CellInput {
-	result := make([]*types.CellInput, len(inputs))
+func toInputs(inputs []cellInput) []*ckbTypes.CellInput {
+	result := make([]*ckbTypes.CellInput, len(inputs))
 	for i := 0; i < len(inputs); i++ {
 		input := inputs[i]
-		result[i] = &types.CellInput{
+		result[i] = &ckbTypes.CellInput{
 			Since: uint64(input.Since),
-			PreviousOutput: &types.OutPoint{
+			PreviousOutput: &ckbTypes.OutPoint{
 				TxHash: input.PreviousOutput.TxHash,
 				Index:  uint(input.PreviousOutput.Index),
 			},
@@ -118,12 +117,12 @@ func toInputs(inputs []cellInput) []*types.CellInput {
 	return result
 }
 
-func toCellDeps(deps []cellDep) []*types.CellDep {
-	result := make([]*types.CellDep, len(deps))
+func toCellDeps(deps []cellDep) []*ckbTypes.CellDep {
+	result := make([]*ckbTypes.CellDep, len(deps))
 	for i := 0; i < len(deps); i++ {
 		dep := deps[i]
-		result[i] = &types.CellDep{
-			OutPoint: &types.OutPoint{
+		result[i] = &ckbTypes.CellDep{
+			OutPoint: &ckbTypes.OutPoint{
 				TxHash: dep.OutPoint.TxHash,
 				Index:  uint(dep.OutPoint.Index),
 			},
@@ -133,7 +132,7 @@ func toCellDeps(deps []cellDep) []*types.CellDep {
 	return result
 }
 
-func FromTransaction(tx *types.Transaction) (string, error) {
+func FromTransaction(tx *ckbTypes.Transaction) (string, error) {
 	result := inTransaction{
 		Version:     hexutil.Uint(tx.Version),
 		HeaderDeps:  tx.HeaderDeps,
@@ -150,7 +149,7 @@ func FromTransaction(tx *types.Transaction) (string, error) {
 	return string(data), nil
 }
 
-func fromCellDeps(deps []*types.CellDep) []cellDep {
+func fromCellDeps(deps []*ckbTypes.CellDep) []cellDep {
 	result := make([]cellDep, len(deps))
 	for i := 0; i < len(deps); i++ {
 		dep := deps[i]
@@ -165,7 +164,7 @@ func fromCellDeps(deps []*types.CellDep) []cellDep {
 	return result
 }
 
-func fromInputs(inputs []*types.CellInput) []cellInput {
+func fromInputs(inputs []*ckbTypes.CellInput) []cellInput {
 	result := make([]cellInput, len(inputs))
 	for i := 0; i < len(inputs); i++ {
 		input := inputs[i]
@@ -180,7 +179,7 @@ func fromInputs(inputs []*types.CellInput) []cellInput {
 	return result
 }
 
-func fromOutputs(outputs []*types.CellOutput) []cellOutput {
+func fromOutputs(outputs []*ckbTypes.CellOutput) []cellOutput {
 	result := make([]cellOutput, len(outputs))
 	for i := 0; i < len(outputs); i++ {
 		output := outputs[i]
