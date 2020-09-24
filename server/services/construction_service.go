@@ -89,6 +89,9 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	if err := types.UnmarshalMap(request.Options, &options); err != nil {
 		return nil, InvalidPreprocessOptionsError
 	}
+	if !SupportedTxTypes[options.TxType] {
+		return nil, wrapErr(UnsupportedTxType, fmt.Errorf("unsupported tx type: %s", options.TxType))
+	}
 	metadata, err := types.MarshalMap(&ckb.ConstructionMetadata{
 		TxType: options.TxType,
 	})

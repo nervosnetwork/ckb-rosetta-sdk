@@ -179,6 +179,10 @@ var (
 		ckb.RewardOpType,
 	}
 
+	SupportedTxTypes = map[string]bool{
+		ckb.Secp256k1Tx: true,
+	}
+
 	MinCapacity   uint64 = 6100000000
 	AllErrorTypes        = []*types.Error{
 		NoImplementError,
