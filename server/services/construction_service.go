@@ -2,16 +2,16 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/factory"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
 	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
 	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
-	"log"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIService interface.
@@ -33,36 +33,47 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	inputTotalAmount, err := validateInputOperations(request.Operations)
-	if err != nil {
-		return nil, err
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations)
+	if validateErr != nil {
+		return nil, validateErr
 	}
 
-	outputTotalAmount, err := validateOutputOperations(request.Operations)
-	if err != nil {
-		return nil, err
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations)
+	if validateErr != nil {
+		return nil, validateErr
 	}
 
-	err = validateCapacity(inputTotalAmount, outputTotalAmount)
-	if err != nil {
-		return nil, err
+	validateErr = validateCapacity(inputTotalAmount, outputTotalAmount)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	var metadata ckb.PreprocessMetadata
+	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
+		return nil, InvalidPreprocessMetadataError
 	}
 
-	_, err = ValidateCellDeps(request.Operations)
+	txSizeEstimatorFactory := new(factory.TxSizeEstimatorFactory)
+	txSizeEstimator := txSizeEstimatorFactory.CreateTxSizeEstimator(metadata.TxType)
+	if txSizeEstimator == nil {
+		return nil, wrapErr(UnsupportedTxType, fmt.Errorf("unsupported tx type: %s", metadata.TxType))
+	}
+	estimatedTxSize, err := txSizeEstimator.EstimatedTxSize(request.Operations)
 	if err != nil {
-		return nil, err
+		return nil, wrapErr(DataParseError, err)
 	}
 
-	coinIdentifiersOption, err := generateCoinIdentifiersOption(request)
+	options, err := types.MarshalMap(&ckb.PreprocessOptions{
+		TxType:                 metadata.TxType,
+		EstimatedTxSize:        estimatedTxSize,
+		SuggestedFeeMultiplier: request.SuggestedFeeMultiplier,
+	})
 	if err != nil {
-		return nil, err
+		return nil, InvalidPreprocessOptionsError
 	}
-	response := &types.ConstructionPreprocessResponse{
-		Options: map[string]interface{}{},
-	}
-	response.Options["coin_identifiers"] = coinIdentifiersOption
 
-	return response, nil
+	return &types.ConstructionPreprocessResponse{
+		Options: options,
+	}, nil
 }
 
 // ConstructionMetadata implements the /construction/metadata endpoint.
@@ -70,20 +81,23 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	ctx context.Context,
 	request *types.ConstructionMetadataRequest,
 ) (*types.ConstructionMetadataResponse, *types.Error) {
-	if request.Options == nil || request.Options["coin_identifiers"] == nil {
+	if request.Options == nil {
 		return nil, MissingOptionError
 	}
-	cellInfos, err := fetchLiveCells(ctx, request.Options, s)
+
+	var options ckb.PreprocessOptions
+	if err := types.UnmarshalMap(request.Options, &options); err != nil {
+		return nil, InvalidPreprocessOptionsError
+	}
+	metadata, err := types.MarshalMap(&ckb.ConstructionMetadata{
+		TxType: options.TxType,
+	})
 	if err != nil {
-		return nil, err
+		return nil, InvalidConstructionMetadataError
 	}
-	encodedCellInfos, encodeErr := json.Marshal(cellInfos)
-	if encodeErr != nil {
-		log.Fatal(encodeErr)
-		return nil, ServerError
-	}
+
 	return &types.ConstructionMetadataResponse{
-		Metadata: map[string]interface{}{"inputs": encodedCellInfos},
+		Metadata: metadata,
 	}, nil
 }
 
@@ -107,16 +121,7 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		return nil, validateErr
 	}
 
-	_, validateErr = ValidateCellDeps(request.Operations)
-	if validateErr != nil {
-		return nil, validateErr
-	}
-
-	_, validateErr = validateInputsMetadata(request.Metadata, inputTotalAmount)
-	if validateErr != nil {
-		return nil, validateErr
-	}
-	signingType, validateErr := validateSigningType(request.Metadata)
+	_, validateErr = validateSigningType(request.Metadata)
 	if validateErr != nil {
 		return nil, validateErr
 	}
