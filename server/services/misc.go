@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"log"
 	"math"
 
@@ -107,57 +108,63 @@ var (
 		Retriable: false,
 	}
 
-	LiveCellMetadataHasDeadCellsError = &types.Error{
-		Code:      17,
-		Message:   "Coin identifier has dead cells.",
-		Retriable: false,
-	}
-
 	InvalidLiveCellsError = &types.Error{
-		Code:      18,
+		Code:      17,
 		Message:   "Live cell decoding error.",
 		Retriable: false,
 	}
 
-	MissingInputsOnConstructionPayloadsRequestError = &types.Error{
-		Code:      19,
-		Message:   "Missing inputs on ConstructionPayloadsRequest.",
-		Retriable: false,
-	}
-
-	MissingCellDepsOnOperationError = &types.Error{
-		Code:      20,
-		Message:   "Missing cell deps on operation.",
-		Retriable: false,
-	}
-
-	InvalidCellDepError = &types.Error{
-		Code:      21,
-		Message:   "Invalid Cell dep error.",
-		Retriable: false,
-	}
-
 	InvalidTypeScriptError = &types.Error{
-		Code:      22,
+		Code:      18,
 		Message:   "Invalid type script error.",
 		Retriable: false,
 	}
 
 	InvalidOutputDataError = &types.Error{
-		Code:      23,
+		Code:      19,
 		Message:   "Invalid output data error.",
 		Retriable: false,
 	}
 
 	MissingSigningTypeError = &types.Error{
-		Code:      24,
+		Code:      20,
 		Message:   "Missing signing type error.",
 		Retriable: false,
 	}
 
-	MissingCoinIdentifiersError = &types.Error{
+	InvalidPreprocessMetadataError = &types.Error{
+		Code:      21,
+		Message:   "invalid preprocess metadata error.",
+		Retriable: false,
+	}
+
+	InvalidPreprocessOptionsError = &types.Error{
+		Code:      22,
+		Message:   "invalid preprocess options error.",
+		Retriable: false,
+	}
+
+	InvalidConstructionMetadataError = &types.Error{
+		Code:      23,
+		Message:   "invalid construction metadata error.",
+		Retriable: false,
+	}
+
+	InvalidOperationMetadataError = &types.Error{
+		Code:      24,
+		Message:   "invalid operation metadata error.",
+		Retriable: false,
+	}
+
+	DataParseError = &types.Error{
 		Code:      25,
-		Message:   "Missing coin identifiers error.",
+		Message:   "invalid operation metadata error.",
+		Retriable: false,
+	}
+
+	UnsupportedTxType = &types.Error{
+		Code:      26,
+		Message:   "unsupported transaction type error.",
 		Retriable: false,
 	}
 
@@ -167,10 +174,9 @@ var (
 	}
 
 	SupportedOperationTypes = []string{
-		"Input",
-		"Output",
-		"Fee",
-		"Reward",
+		ckb.InputOpType,
+		ckb.OutputOpType,
+		ckb.RewardOpType,
 	}
 
 	MinCapacity   uint64 = 6100000000
@@ -190,14 +196,16 @@ var (
 		LessThanMinCapacityError,
 		CapacityNotEnoughError,
 		CoinIdentifierInvalidError,
-		LiveCellMetadataHasDeadCellsError,
-		MissingInputsOnConstructionPayloadsRequestError,
-		MissingCellDepsOnOperationError,
-		InvalidCellDepError,
+		MissingOptionError,
 		InvalidTypeScriptError,
 		InvalidOutputDataError,
-		MissingCoinIdentifiersError,
 		MissingSigningTypeError,
+		InvalidPreprocessMetadataError,
+		InvalidPreprocessOptionsError,
+		InvalidConstructionMetadataError,
+		InvalidOperationMetadataError,
+		DataParseError,
+		UnsupportedTxType,
 	}
 )
 
