@@ -7,24 +7,27 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/factory"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
 	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
-	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIService interface.
 type ConstructionAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewConstructionAPIService creates a new instance of a ConstructionAPIService.
-func NewConstructionAPIService(network *types.NetworkIdentifier, client rpc.Client) server.ConstructionAPIServicer {
+func NewConstructionAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.ConstructionAPIServicer {
 	return &ConstructionAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
 }
 
@@ -33,12 +36,12 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	ctx context.Context,
 	request *types.ConstructionPreprocessRequest,
 ) (*types.ConstructionPreprocessResponse, *types.Error) {
-	inputTotalAmount, validateErr := validateInputOperations(request.Operations)
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations, s.cfg)
 	if validateErr != nil {
 		return nil, validateErr
 	}
 
-	outputTotalAmount, validateErr := validateOutputOperations(request.Operations)
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations, s.cfg)
 	if validateErr != nil {
 		return nil, validateErr
 	}
@@ -55,7 +58,7 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	txSizeEstimatorFactory := new(factory.TxSizeEstimatorFactory)
 	txSizeEstimator := txSizeEstimatorFactory.CreateTxSizeEstimator(metadata.TxType)
 	if txSizeEstimator == nil {
-		return nil, wrapErr(UnsupportedTxType, fmt.Errorf("unsupported tx type: %s", metadata.TxType))
+		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", metadata.TxType))
 	}
 	estimatedTxSize, err := txSizeEstimator.EstimatedTxSize(request.Operations)
 	if err != nil {
@@ -90,7 +93,7 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 		return nil, InvalidPreprocessOptionsError
 	}
 	if !SupportedTxTypes[options.TxType] {
-		return nil, wrapErr(UnsupportedTxType, fmt.Errorf("unsupported tx type: %s", options.TxType))
+		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", options.TxType))
 	}
 	shannonsPerKB := float64(ckb.MinFeeRate)
 	if options.SuggestedFeeMultiplier != nil {
@@ -121,12 +124,12 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	ctx context.Context,
 	request *types.ConstructionPayloadsRequest,
 ) (*types.ConstructionPayloadsResponse, *types.Error) {
-	inputTotalAmount, validateErr := validateInputOperations(request.Operations)
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations, s.cfg)
 	if validateErr != nil {
 		return nil, validateErr
 	}
 
-	outputTotalAmount, validateErr := validateOutputOperations(request.Operations)
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations, s.cfg)
 	if validateErr != nil {
 		return nil, validateErr
 	}
@@ -136,111 +139,31 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		return nil, validateErr
 	}
 
-	_, validateErr = validateSigningType(request.Metadata)
+	txType, validateErr := validateTxType(request.Metadata)
 	if validateErr != nil {
 		return nil, validateErr
 	}
-
-	//
-	//systemScripts, err := utils.NewSystemScripts(s.client)
-	//if err != nil {
-	//	return nil, ServerError
-	//}
-	//
-	//tx := ckbTransaction.NewSecp256k1SingleSigTx(systemScripts)
-	//payloads := make([]*types.SigningPayload, 0)
-	//for _, operation := range request.Operations {
-	//	addr, err := address.Parse(operation.Account.Address)
-	//	if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
-	//		addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
-	//		return nil, &types.Error{
-	//			Code:      7,
-	//			Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
-	//			Retriable: true,
-	//		}
-	//	}
-	//
-	//	amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-	//	if err != nil || amount == 0 {
-	//		return nil, &types.Error{
-	//			Code:      8,
-	//			Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
-	//			Retriable: true,
-	//		}
-	//	}
-	//	if amount > 0 {
-	//		if amount < MinCapacity {
-	//			return nil, &types.Error{
-	//				Code:      9,
-	//				Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
-	//				Retriable: true,
-	//			}
-	//		}
-	//
-	//		tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
-	//			Capacity: uint64(amount),
-	//			Lock:     addr.Script,
-	//		})
-	//		tx.OutputsData = append(tx.OutputsData, []byte{})
-	//	} else {
-	//		amount = -amount
-	//
-	//		liveCells, err := s.client.GetCells(context.Background(), &indexer.SearchKey{
-	//			Script:     addr.Script,
-	//			ScriptType: indexer.ScriptTypeLock,
-	//		}, indexer.SearchOrderAsc, 1000, "")
-	//		if err != nil {
-	//			return nil, ServerError
-	//		}
-	//
-	//		fromCapacity := int64(0)
-	//		inputs := make([]*ckbTypes.Cell, 0)
-	//		for _, cell := range liveCells.Objects {
-	//			if cell.Output.Type == nil && len(cell.OutputData) == 0 {
-	//				fromCapacity += int64(cell.Output.Capacity)
-	//				inputs = append(inputs, &ckbTypes.Cell{
-	//					OutPoint: &ckbTypes.OutPoint{
-	//						TxHash: cell.OutPoint.TxHash,
-	//						Index:  cell.OutPoint.Index,
-	//					},
-	//				})
-	//				if fromCapacity < amount {
-	//					continue
-	//				}
-	//				if fromCapacity-amount >= MinCapacity {
-	//					tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
-	//						Capacity: uint64(fromCapacity - amount),
-	//						Lock:     addr.Script,
-	//					})
-	//					tx.OutputsData = append(tx.OutputsData, []byte{})
-	//				}
-	//			}
-	//		}
-	//
-	//		group, witnessArgs, err := ckbTransaction.AddInputsForTransaction(tx, inputs)
-	//		if err != nil {
-	//			return nil, ServerError
-	//		}
-	//
-	//		// TODO remove to transaction generated
-	//		payload, err := ckbTransaction.SingleSegmentSignMessage(tx, group[0], group[0]+len(group), witnessArgs)
-	//		if err != nil {
-	//			return nil, ServerError
-	//		}
-	//		payloads = append(payloads, &types.SigningPayload{
-	//			Address:       operation.Account.Address,
-	//			Bytes:         payload,
-	//			SignatureType: types.EcdsaRecovery,
-	//		})
-	//	}
-	//}
-	//
-	//txString, err := ckbRpc.TransactionString(tx)
-	//return &types.ConstructionPayloadsResponse{
-	//	UnsignedTransaction: txString,
-	//	Payloads:            payloads,
-	//}, nil
-	return nil, nil
+	unsignedTxBuilderFactory := factory.UnsignedTxBuilderFactory{}
+	inputOperations, outputOperations := separateInputAndOutput(request.Operations)
+	unsignedTxBuilder := unsignedTxBuilderFactory.CreateUnsignedTxBuilder(txType, s.cfg, inputOperations, outputOperations)
+	if unsignedTxBuilder == nil {
+		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", txType))
+	}
+	unsignedTx, err := unsignedTxBuilder.Build()
+	if err != nil {
+		return nil, wrapErr(UnsignedTxBuildError, err)
+	}
+	signingPayloadBuilderFactory := SigningPayloadBuilderFactory{}
+	signingPayloadBuilder := signingPayloadBuilderFactory.CreateSigningPayloadBuilder(txType)
+	payloads, err := signingPayloadBuilder.BuildSigningPayload(inputOperations, unsignedTx)
+	if err != nil {
+		return nil, wrapErr(SigningPayloadBuildError, err)
+	}
+	txString, err := ckbRpc.TransactionString(unsignedTx)
+	return &types.ConstructionPayloadsResponse{
+		UnsignedTransaction: txString,
+		Payloads:            payloads,
+	}, nil
 }
 
 // ConstructionCombine implements the /construction/combine endpoint.
@@ -338,8 +261,8 @@ func (s *ConstructionAPIService) ConstructionParse(
 	}
 
 	return &types.ConstructionParseResponse{
-		Operations: operations,
-		Signers:    addresses,
+		Operations:               operations,
+		AccountIdentifierSigners: nil,
 	}, nil
 }
 
@@ -425,7 +348,7 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		prefix = address.Testnet
 	}
 
-	addr, err := address.Generate(prefix, &ckbTypes.Script{
+	_, err = address.Generate(prefix, &ckbTypes.Script{
 		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
 		HashType: ckbTypes.HashTypeType,
 		Args:     args,
@@ -439,6 +362,6 @@ func (s *ConstructionAPIService) ConstructionDerive(
 	}
 
 	return &types.ConstructionDeriveResponse{
-		Address: addr,
+		AccountIdentifier: nil,
 	}, nil
 }
