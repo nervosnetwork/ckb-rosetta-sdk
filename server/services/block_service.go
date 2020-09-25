@@ -3,24 +3,27 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 	typesCKB "github.com/nervosnetwork/ckb-sdk-go/types"
-	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
 )
 
 // BlockAPIService implements the server.BlockAPIServicer interface.
 type BlockAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewBlockAPIService creates a new instance of a BlockAPIService.
-func NewBlockAPIService(network *types.NetworkIdentifier, client rpc.Client) server.BlockAPIServicer {
+func NewBlockAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.BlockAPIServicer {
 	return &BlockAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
 }
 

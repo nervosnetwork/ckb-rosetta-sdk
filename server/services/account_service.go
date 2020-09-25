@@ -3,25 +3,28 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
-	"github.com/shaojunda/ckb-rich-sdk-go/indexer"
-	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
+	"github.com/nervosnetwork/ckb-sdk-go/indexer"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 )
 
 // AccountAPIService implements the server.AccountAPIServicer interface.
 type AccountAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewAccountAPIService creates a new instance of a AccountAPIService.
-func NewAccountAPIService(network *types.NetworkIdentifier, client rpc.Client) server.AccountAPIServicer {
+func NewAccountAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.AccountAPIServicer {
 	return &AccountAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
 }
 
