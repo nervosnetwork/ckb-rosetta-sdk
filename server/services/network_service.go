@@ -2,23 +2,26 @@ package services
 
 import (
 	"context"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/shaojunda/ckb-rich-sdk-go/rpc"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 )
 
 // NetworkAPIService implements the server.NetworkAPIService interface.
 type NetworkAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewNetworkAPIService creates a new instance of a NetworkAPIService.
-func NewNetworkAPIService(network *types.NetworkIdentifier, client rpc.Client) server.NetworkAPIServicer {
+func NewNetworkAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.NetworkAPIServicer {
 	return &NetworkAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
 }
 

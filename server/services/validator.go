@@ -4,6 +4,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
 	"strconv"
 )
@@ -15,9 +16,9 @@ func validateCapacity(inputTotalAmount uint64, outputTotalAmount uint64) *types.
 	return nil
 }
 
-func validateOutputOperations(operations []*types.Operation) (uint64, *types.Error) {
+func validateOutputOperations(operations []*types.Operation, cfg *config.Config) (uint64, *types.Error) {
 	var outputTotalAmount uint64
-	outputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
+	outputOperations := operationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == ckb.OutputOpType
 	})
 	if len(outputOperations) == 0 {
@@ -37,7 +38,7 @@ func validateOutputOperations(operations []*types.Operation) (uint64, *types.Err
 		if err != nil {
 			return 0, AddressParseError
 		}
-		if isBlake160SighashAllLock(addr) {
+		if isBlake160SighashAllLock(addr, cfg) {
 			if i == operationSize-1 {
 				continue
 			}
@@ -51,9 +52,9 @@ func validateOutputOperations(operations []*types.Operation) (uint64, *types.Err
 	return outputTotalAmount, nil
 }
 
-func validateInputOperations(operations []*types.Operation) (uint64, *types.Error) {
+func validateInputOperations(operations []*types.Operation, cfg *config.Config) (uint64, *types.Error) {
 	var inputTotalAmount uint64
-	inputOperations := OperationFilter(operations, func(operation *types.Operation) bool {
+	inputOperations := operationFilter(operations, func(operation *types.Operation) bool {
 		return operation.Type == ckb.InputOpType
 	})
 
@@ -75,7 +76,7 @@ func validateInputOperations(operations []*types.Operation) (uint64, *types.Erro
 			return 0, AddressParseError
 		}
 		// do not support send to multisig all lock
-		if isBlake160MultisigAllLock(addr) {
+		if isBlake160MultisigAllLock(addr, cfg) {
 			return 0, NotSupportMultisigAllLockError
 		}
 

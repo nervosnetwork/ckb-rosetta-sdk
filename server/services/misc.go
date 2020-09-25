@@ -108,12 +108,6 @@ var (
 		Retriable: false,
 	}
 
-	InvalidLiveCellsError = &types.Error{
-		Code:      17,
-		Message:   "Live cell decoding error.",
-		Retriable: false,
-	}
-
 	InvalidTypeScriptError = &types.Error{
 		Code:      18,
 		Message:   "Invalid type script error.",
@@ -162,9 +156,21 @@ var (
 		Retriable: false,
 	}
 
-	UnsupportedTxType = &types.Error{
+	UnsupportedTxTypeError = &types.Error{
 		Code:      26,
 		Message:   "unsupported transaction type error.",
+		Retriable: false,
+	}
+
+	ScriptHashComputedError = &types.Error{
+		Code:      27,
+		Message:   "script hash computed error.",
+		Retriable: false,
+	}
+
+	UnsignedTxBuildError = &types.Error{
+		Code:      28,
+		Message:   "unsigned tx build error.",
 		Retriable: false,
 	}
 
@@ -209,7 +215,9 @@ var (
 		InvalidConstructionMetadataError,
 		InvalidOperationMetadataError,
 		DataParseError,
-		UnsupportedTxType,
+		UnsupportedTxTypeError,
+		ScriptHashComputedError,
+		UnsignedTxBuildError,
 	}
 )
 
