@@ -1,135 +1,132 @@
 package builder
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/nervosnetwork/ckb-rosetta-sdk/server/services"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
+	"github.com/nervosnetwork/ckb-sdk-go/transaction"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"strconv"
 )
 
-var _ UnsignedTxBuilder = UnsignedTxBuilderSecp256k1{}
+var _ UnsignedTxBuilderInterface = UnsignedTxBuilderSecp256k1{}
+
+const txVersion uint = 0
 
 type UnsignedTxBuilderSecp256k1 struct {
-	Operations []*types.Operation
-	Inputs     []ckbTypes.CellInfo
-	Metadata   map[string]interface{}
+	UnsignedTxBuilder
+	Cfg              *config.Config
+	InputOperations  []*types.Operation
+	OutputOperations []*types.Operation
 }
 
-func (b UnsignedTxBuilderSecp256k1) BuildVersion() (hexutil.Uint, *types.Error) {
-	var defaultVersion uint
-	strVersion, ok := b.Metadata["version"].(string)
-	if !ok {
-		return hexutil.Uint(defaultVersion), nil
+func NewUnsignedTxBuilderSecp256k1(cfg *config.Config, inputOperations []*types.Operation, outputOperations []*types.Operation) *UnsignedTxBuilderSecp256k1 {
+	b := UnsignedTxBuilderSecp256k1{
+		Cfg:              cfg,
+		InputOperations:  inputOperations,
+		OutputOperations: outputOperations,
 	}
-	uVersion, err := strconv.ParseUint(strVersion, 10, 64)
-	if err != nil {
-		return hexutil.Uint(defaultVersion), nil
-	}
-	return hexutil.Uint(uVersion), nil
+	b.UnsignedTxBuilder.BuildVersion = b.BuildVersion
+	b.UnsignedTxBuilder.BuildCellDeps = b.BuildCellDeps
+	b.UnsignedTxBuilder.BuildHeaderDeps = b.BuildHeaderDeps
+	b.UnsignedTxBuilder.BuildInputs = b.BuildInputs
+	b.UnsignedTxBuilder.BuildOutputs = b.BuildOutputs
+	b.UnsignedTxBuilder.BuildOutputsData = b.BuildOutputsData
+	b.UnsignedTxBuilder.BuildWitnesses = b.BuildWitnesses
+	return &b
 }
 
-func (b UnsignedTxBuilderSecp256k1) BuildCellDeps() ([]ckbTypes.CellDep, *types.Error) {
-	var cellDepArr []ckbTypes.CellDep
-	cellDeps, err := services.ValidateCellDeps(b.Operations)
-	if err != nil {
-		return nil, err
-	}
-	for _, cellDep := range cellDeps {
-		cellDepArr = append(cellDepArr, cellDep)
-	}
-	return cellDepArr, nil
+func (b UnsignedTxBuilderSecp256k1) BuildVersion() (uint, error) {
+	return txVersion, nil
 }
 
-func (b UnsignedTxBuilderSecp256k1) BuildHeaderDeps() ([]ckbTypes.Hash, *types.Error) {
-	strHeaderDeps, ok := b.Metadata["header_deps"].(string)
-	if !ok {
-		return []ckbTypes.Hash{}, nil
-	}
-	decodedHeaderDeps, err := base64.StdEncoding.DecodeString(strHeaderDeps)
-	if err != nil {
-		return []ckbTypes.Hash{}, nil
-	}
-	var headerDeps []ckbTypes.Hash
-	err = json.Unmarshal(decodedHeaderDeps, &headerDeps)
-	if err != nil {
-		return []ckbTypes.Hash{}, nil
-	}
-	return headerDeps, nil
-}
-
-func (b UnsignedTxBuilderSecp256k1) BuildOutputs() ([]ckbTypes.CellOutput, *types.Error) {
-	outputOperations := services.OperationFilter(b.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Output"
+func (b UnsignedTxBuilderSecp256k1) BuildCellDeps() ([]*ckbTypes.CellDep, error) {
+	var cellDeps []*ckbTypes.CellDep
+	cellDeps = append(cellDeps, &ckbTypes.CellDep{
+		OutPoint: &ckbTypes.OutPoint{
+			TxHash: ckbTypes.HexToHash(b.Cfg.Secp256k1Blake160.Deps[0].TxHash),
+			Index:  b.Cfg.Secp256k1Blake160.Deps[0].Index,
+		},
+		DepType: ckbTypes.DepType(b.Cfg.Secp256k1Blake160.Deps[0].DepType),
 	})
-	var outputs []ckbTypes.CellOutput
-	for _, operation := range outputOperations {
-		capacity, err := strconv.ParseUint(operation.Amount.Value, 10, 64)
+
+	return cellDeps, nil
+}
+
+func (b UnsignedTxBuilderSecp256k1) BuildHeaderDeps() ([]ckbTypes.Hash, error) {
+	return []ckbTypes.Hash{}, nil
+}
+
+func (b UnsignedTxBuilderSecp256k1) BuildInputs() ([]*ckbTypes.CellInput, map[string]interface{}, error) {
+	var cellInputs []*ckbTypes.CellInput
+	for _, operation := range b.InputOperations {
+		outPoint, err := GenerateOutPointFromCoinIdentifier(operation.CoinChange.CoinIdentifier.Identifier)
 		if err != nil {
-			return nil, services.InvalidOutputOperationAmountValueError
+			return nil, nil, err
 		}
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil {
-			return nil, services.AddressParseError
-		}
-		var typeScript *ckbTypes.Script
-		strTypeScript, ok := operation.Metadata["type_script"].(string)
-		if ok {
-			decodedTypeScript, err := base64.StdEncoding.DecodeString(strTypeScript)
-			if err != nil {
-				return nil, services.InvalidTypeScriptError
-			}
-			err = json.Unmarshal(decodedTypeScript, typeScript)
-			if err != nil {
-				return nil, services.InvalidTypeScriptError
-			}
-		}
-		outputs = append(outputs, ckbTypes.CellOutput{
-			Capacity: capacity,
-			Lock:     addr.Script,
-			Type:     typeScript,
+		cellInputs = append(cellInputs, &ckbTypes.CellInput{
+			Since:          0,
+			PreviousOutput: outPoint,
 		})
 	}
-	return outputs, nil
+	return cellInputs, nil, nil
 }
 
-func (b UnsignedTxBuilderSecp256k1) BuildOutputsData() ([][]byte, *types.Error) {
-	outputOperations := services.OperationFilter(b.Operations, func(operation *types.Operation) bool {
-		return operation.Type == "Output"
-	})
-	var outputsData [][]byte
-	for _, operation := range outputOperations {
-		strOutputData, ok := operation.Metadata["output_data"].(string)
-		if ok {
-			decodedOutputData, err := base64.StdEncoding.DecodeString(strOutputData)
-			if err != nil {
-				return nil, services.InvalidOutputDataError
-			}
-			var outputData []byte
-			err = json.Unmarshal(decodedOutputData, &outputData)
-			if err != nil {
-				return nil, services.InvalidOutputDataError
-			}
-			outputsData = append(outputsData, outputData)
-		} else {
-			outputsData = append(outputsData, []byte{})
+func (b UnsignedTxBuilderSecp256k1) BuildOutputs(options map[string]interface{}) ([]*ckbTypes.CellOutput, map[string]interface{}, error) {
+	var cellOutputs []*ckbTypes.CellOutput
+	for _, operation := range b.OutputOperations {
+		parsedAddress, err := address.Parse(operation.Account.Address)
+		if err != nil {
+			return nil, nil, err
 		}
+		capacity, err := strconv.ParseUint(operation.Amount.Value, 10, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		cellOutputs = append(cellOutputs, &ckbTypes.CellOutput{
+			Capacity: capacity,
+			Lock:     parsedAddress.Script,
+		})
 	}
+	return cellOutputs, nil, nil
+}
 
+func (b UnsignedTxBuilderSecp256k1) BuildOutputsData(options map[string]interface{}) ([][]byte, error) {
+	var outputsData [][]byte
+	outputsSize := len(b.OutputOperations)
+	for i := 0; i < outputsSize-1; i++ {
+		outputsData = append(outputsData, []byte{})
+	}
 	return outputsData, nil
 }
 
-func (b UnsignedTxBuilderSecp256k1) BuildWitnesses() ([][]byte, *types.Error) {
-	panic("implement me")
-}
+func (b UnsignedTxBuilderSecp256k1) BuildWitnesses() ([][]byte, error) {
+	cellInputsSize := len(b.InputOperations)
+	witnesses := make([][]byte, cellInputsSize)
+	lockScriptHashes := make(map[ckbTypes.Hash][]int)
+	for i, operation := range b.InputOperations {
+		parsedAddress, err := address.Parse(operation.Account.Address)
+		if err != nil {
+			return nil, err
+		}
+		lockHash, err := parsedAddress.Script.Hash()
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := lockScriptHashes[lockHash]; !ok {
+			lockScriptHashes[lockHash] = append(lockScriptHashes[lockHash], i)
+		}
+	}
 
-func (b UnsignedTxBuilderSecp256k1) BuildInputs() ([]ckbTypes.CellInput, *types.Error) {
-	panic("implement me")
-}
+	indexGroups := make([][]int, 0, len(lockScriptHashes))
+	for _, index := range lockScriptHashes {
+		indexGroups = append(indexGroups, index)
+	}
+	emptyWitness, _ := transaction.EmptyWitnessArg.Serialize()
+	for _, indexes := range indexGroups {
+		firstIndexOfGroup := indexes[0]
+		witnesses[firstIndexOfGroup] = emptyWitness
+	}
 
-func (b UnsignedTxBuilderSecp256k1) GetResult() (ckbTypes.Transaction, *types.Error) {
-	panic("implement me")
+	return witnesses, nil
 }
