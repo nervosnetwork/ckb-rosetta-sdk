@@ -4,7 +4,6 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
-	"github.com/nervosnetwork/ckb-sdk-go/transaction"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 	"strconv"
 )
@@ -94,7 +93,7 @@ func (b UnsignedTxBuilderSecp256k1) BuildOutputs(options map[string]interface{})
 func (b UnsignedTxBuilderSecp256k1) BuildOutputsData(options map[string]interface{}) ([][]byte, error) {
 	var outputsData [][]byte
 	outputsSize := len(b.OutputOperations)
-	for i := 0; i < outputsSize-1; i++ {
+	for i := 0; i < outputsSize; i++ {
 		outputsData = append(outputsData, []byte{})
 	}
 	return outputsData, nil
@@ -103,29 +102,13 @@ func (b UnsignedTxBuilderSecp256k1) BuildOutputsData(options map[string]interfac
 func (b UnsignedTxBuilderSecp256k1) BuildWitnesses() ([][]byte, error) {
 	cellInputsSize := len(b.InputOperations)
 	witnesses := make([][]byte, cellInputsSize)
-	lockScriptHashes := make(map[ckbTypes.Hash][]int)
-	for i, operation := range b.InputOperations {
-		parsedAddress, err := address.Parse(operation.Account.Address)
-		if err != nil {
-			return nil, err
-		}
-		lockHash, err := parsedAddress.Script.Hash()
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := lockScriptHashes[lockHash]; !ok {
-			lockScriptHashes[lockHash] = append(lockScriptHashes[lockHash], i)
-		}
+	indexGroups, err := BuildIndexGroups(b.InputOperations)
+	if err != nil {
+		return nil, err
 	}
-
-	indexGroups := make([][]int, 0, len(lockScriptHashes))
-	for _, index := range lockScriptHashes {
-		indexGroups = append(indexGroups, index)
-	}
-	emptyWitness, _ := transaction.EmptyWitnessArg.Serialize()
 	for _, indexes := range indexGroups {
 		firstIndexOfGroup := indexes[0]
-		witnesses[firstIndexOfGroup] = emptyWitness
+		witnesses[firstIndexOfGroup] = make([]byte, 85) // empty witnessArg placeholder
 	}
 
 	return witnesses, nil

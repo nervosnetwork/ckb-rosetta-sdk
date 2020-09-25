@@ -174,6 +174,18 @@ var (
 		Retriable: false,
 	}
 
+	SignMessagesBuildError = &types.Error{
+		Code:      29,
+		Message:   "signing messages build error.",
+		Retriable: false,
+	}
+
+	SigningPayloadBuildError = &types.Error{
+		Code:      30,
+		Message:   "signing payload build error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -218,6 +230,8 @@ var (
 		UnsupportedTxTypeError,
 		ScriptHashComputedError,
 		UnsignedTxBuildError,
+		SignMessagesBuildError,
+		SigningPayloadBuildError,
 	}
 )
 
