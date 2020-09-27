@@ -10,7 +10,7 @@ type SignMessagesBuilderFactory struct{}
 func (f SignMessagesBuilderFactory) CreateSignMessagesBuilder(txType string) builder.SignMessagesBuilderInterface {
 	switch txType {
 	case ckb.Secp256k1Tx:
-		return builder.NewSecp256k1Blake160SignMessagesBuilder()
+		return builder.NewSignMessagesBuilderSecp256k1Blake160()
 	default:
 		return nil
 	}

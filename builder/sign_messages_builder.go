@@ -10,13 +10,13 @@ type SignMessagesBuilderInterface interface {
 	BuildSignMessages(tx *ckbTypes.Transaction, inputOperations []*types.Operation) ([][]byte, error)
 }
 
-func NewSecp256k1Blake160SignMessagesBuilder() *Secp256k1Blake160SignMessagesBuilder {
-	return &Secp256k1Blake160SignMessagesBuilder{}
+func NewSignMessagesBuilderSecp256k1Blake160() *SignMessagesBuilderSecp256k1Blake160 {
+	return &SignMessagesBuilderSecp256k1Blake160{}
 }
 
-type Secp256k1Blake160SignMessagesBuilder struct{}
+type SignMessagesBuilderSecp256k1Blake160 struct{}
 
-func (s Secp256k1Blake160SignMessagesBuilder) BuildSignMessages(tx *ckbTypes.Transaction, inputOperations []*types.Operation) ([][]byte, error) {
+func (s SignMessagesBuilderSecp256k1Blake160) BuildSignMessages(tx *ckbTypes.Transaction, inputOperations []*types.Operation) ([][]byte, error) {
 	indexGroups, err := BuildIndexGroups(inputOperations)
 	if err != nil {
 		return nil, err
