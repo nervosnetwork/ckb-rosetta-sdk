@@ -153,7 +153,7 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 	if err != nil {
 		return nil, wrapErr(UnsignedTxBuildError, err)
 	}
-	signingPayloadBuilderFactory := SigningPayloadBuilderFactory{}
+	signingPayloadBuilderFactory := factory.SigningPayloadBuilderFactory{}
 	signingPayloadBuilder := signingPayloadBuilderFactory.CreateSigningPayloadBuilder(txType)
 	payloads, err := signingPayloadBuilder.BuildSigningPayload(inputOperations, unsignedTx)
 	if err != nil {
