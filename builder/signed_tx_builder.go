@@ -18,13 +18,13 @@ func NewSignedTxCombinerSecp256k1Blake160() *SignedTxCombinerSecp256k1Blake160 {
 type SignedTxCombinerSecp256k1Blake160 struct{}
 
 func (c SignedTxCombinerSecp256k1Blake160) Combine(unsignedTxStr string, signatures []*types.Signature) (string, error) {
-	tx, err := ckbRpc.TransactionFromString(unsignedTxStr)
-	emptyWitnessArg := make([]byte, 85)
+	unsignedTx, err := ckbRpc.TransactionFromString(unsignedTxStr)
 	if err != nil {
 		return "", err
 	}
+	emptyWitnessArg := make([]byte, 85)
 	sIndex := 0
-	for i, witness := range tx.Witnesses {
+	for i, witness := range unsignedTx.Witnesses {
 		if bytes.Compare(witness, emptyWitnessArg) == 0 {
 			witnessArgs := &ckbTypes.WitnessArgs{
 				Lock: signatures[sIndex].Bytes,
@@ -33,11 +33,11 @@ func (c SignedTxCombinerSecp256k1Blake160) Combine(unsignedTxStr string, signatu
 			if err != nil {
 				return "", err
 			}
-			tx.Witnesses[i] = serializedWitness
+			unsignedTx.Witnesses[i] = serializedWitness
 			sIndex++
 		}
 	}
-	signedTxStr, err := ckbRpc.TransactionString(tx)
+	signedTxStr, err := ckbRpc.TransactionString(unsignedTx)
 	if err != nil {
 		return "", err
 	}

@@ -186,6 +186,12 @@ var (
 		Retriable: false,
 	}
 
+	SignedTxBuildError = &types.Error{
+		Code:      31,
+		Message:   "signed tx build error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -232,6 +238,7 @@ var (
 		UnsignedTxBuildError,
 		SignMessagesBuildError,
 		SigningPayloadBuildError,
+		SignedTxBuildError,
 	}
 )
 

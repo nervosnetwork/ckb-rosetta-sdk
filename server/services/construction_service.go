@@ -171,28 +171,15 @@ func (s *ConstructionAPIService) ConstructionCombine(
 	ctx context.Context,
 	request *types.ConstructionCombineRequest,
 ) (*types.ConstructionCombineResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.UnsignedTransaction)
+	unsignedTxCombinerFactory := factory.SignedTxBuilder{}
+	txType := ckb.Secp256k1Tx
+	signedTxBuilder := unsignedTxCombinerFactory.CreateSignedTxBuilder(txType)
+	signedTxStr, err := signedTxBuilder.Combine(request.UnsignedTransaction, request.Signatures)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.UnsignedTransaction),
-			Retriable: false,
-		}
-	}
-	index := 0
-	for i, witness := range tx.Witnesses {
-		if len(witness) != 0 {
-			tx.Witnesses[i] = request.Signatures[index].Bytes
-			index++
-		}
-	}
-
-	txString, err := ckbRpc.TransactionString(tx)
-	if err != nil {
-		return nil, ServerError
+		return nil, wrapErr(SignedTxBuildError, err)
 	}
 	return &types.ConstructionCombineResponse{
-		SignedTransaction: txString,
+		SignedTransaction: signedTxStr,
 	}, nil
 }
 
