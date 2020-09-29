@@ -291,20 +291,12 @@ func (s *ConstructionAPIService) ConstructionSubmit(
 ) (*types.TransactionIdentifierResponse, *types.Error) {
 	tx, err := ToTransaction(request.SignedTransaction)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      4,
-			Message:   fmt.Sprintf("submit transaction error: %v", err),
-			Retriable: true,
-		}
+		return nil, SubmitError
 	}
 
 	hash, err := s.client.SendTransaction(ctx, tx)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      4,
-			Message:   fmt.Sprintf("submit transaction error: %v", err),
-			Retriable: true,
-		}
+		return nil, SubmitError
 	}
 
 	return &types.TransactionIdentifierResponse{
