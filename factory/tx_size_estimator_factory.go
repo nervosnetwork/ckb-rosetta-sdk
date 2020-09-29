@@ -11,9 +11,9 @@ import (
 
 type TxSizeEstimatorFactory struct{}
 
-func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(txType string) TxSizeEstimater {
-	switch txType {
-	case ckb.Secp256k1Tx:
+func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(constructionType string) TxSizeEstimater {
+	switch constructionType {
+	case ckb.TransferCKB:
 		return NewSecp256k1TxSizeEstimator()
 	default:
 		return nil

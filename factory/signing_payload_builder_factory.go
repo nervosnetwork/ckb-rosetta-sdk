@@ -7,12 +7,12 @@ import (
 
 type SigningPayloadBuilderFactory struct{}
 
-func (f SigningPayloadBuilderFactory) CreateSigningPayloadBuilder(txType string) builder.SigningPayloadBuilder {
-	switch txType {
-	case ckb.Secp256k1Tx:
+func (f SigningPayloadBuilderFactory) CreateSigningPayloadBuilder(constructionType string) builder.SigningPayloadBuilder {
+	switch constructionType {
+	case ckb.TransferCKB:
 		sf := SignMessagesBuilderFactory{}
-		signMessagesBuilder := sf.CreateSignMessagesBuilder(txType)
-		return builder.NewSigningPayloadBuilderSecp256k1Blake160(txType, signMessagesBuilder)
+		signMessagesBuilder := sf.CreateSignMessagesBuilder(constructionType)
+		return builder.NewSigningPayloadBuilderSecp256k1Blake160(constructionType, signMessagesBuilder)
 	default:
 		return nil
 	}

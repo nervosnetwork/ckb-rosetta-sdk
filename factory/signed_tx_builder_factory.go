@@ -7,9 +7,9 @@ import (
 
 type SignedTxBuilder struct{}
 
-func (u SignedTxBuilder) CreateSignedTxBuilder(txType string) builder.SignedTxBuilder {
-	switch txType {
-	case ckb.Secp256k1Tx:
+func (u SignedTxBuilder) CreateSignedTxBuilder(constructionType string) builder.SignedTxBuilder {
+	switch constructionType {
+	case ckb.TransferCKB:
 		return builder.NewSignedTxCombinerSecp256k1Blake160()
 	default:
 		return nil

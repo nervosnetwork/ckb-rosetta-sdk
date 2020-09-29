@@ -7,9 +7,9 @@ import (
 
 type SignMessagesBuilderFactory struct{}
 
-func (f SignMessagesBuilderFactory) CreateSignMessagesBuilder(txType string) builder.SignMessagesBuilder {
-	switch txType {
-	case ckb.Secp256k1Tx:
+func (f SignMessagesBuilderFactory) CreateSignMessagesBuilder(constructionType string) builder.SignMessagesBuilder {
+	switch constructionType {
+	case ckb.TransferCKB:
 		return builder.NewSignMessagesBuilderSecp256k1Blake160()
 	default:
 		return nil

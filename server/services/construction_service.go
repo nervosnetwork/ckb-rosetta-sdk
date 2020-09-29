@@ -50,15 +50,14 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	if validateErr != nil {
 		return nil, validateErr
 	}
-	var metadata ckb.PreprocessMetadata
-	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
-		return nil, InvalidPreprocessMetadataError
+	constructionType, validateErr := getConstructionType(request.Operations, nil, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
 	}
-
 	txSizeEstimatorFactory := new(factory.TxSizeEstimatorFactory)
-	txSizeEstimator := txSizeEstimatorFactory.CreateTxSizeEstimator(metadata.TxType)
+	txSizeEstimator := txSizeEstimatorFactory.CreateTxSizeEstimator(constructionType)
 	if txSizeEstimator == nil {
-		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", metadata.TxType))
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", constructionType))
 	}
 	estimatedTxSize, err := txSizeEstimator.EstimatedTxSize(request.Operations)
 	if err != nil {
@@ -66,7 +65,7 @@ func (s *ConstructionAPIService) ConstructionPreprocess(
 	}
 
 	options, err := types.MarshalMap(&ckb.PreprocessOptions{
-		TxType:                 metadata.TxType,
+		ConstructionType:       constructionType,
 		EstimatedTxSize:        estimatedTxSize,
 		SuggestedFeeMultiplier: request.SuggestedFeeMultiplier,
 	})
@@ -92,8 +91,8 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	if err := types.UnmarshalMap(request.Options, &options); err != nil {
 		return nil, InvalidPreprocessOptionsError
 	}
-	if !SupportedTxTypes[options.TxType] {
-		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", options.TxType))
+	if !SupportedConstructionTypes[options.ConstructionType] {
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", options.ConstructionType))
 	}
 	shannonsPerKB := float64(ckb.MinFeeRate)
 	if options.SuggestedFeeMultiplier != nil {
@@ -107,7 +106,7 @@ func (s *ConstructionAPIService) ConstructionMetadata(
 	}
 
 	metadata, err := types.MarshalMap(&ckb.ConstructionMetadata{
-		TxType: options.TxType,
+		ConstructionType: options.ConstructionType,
 	})
 	if err != nil {
 		return nil, InvalidConstructionMetadataError
@@ -139,22 +138,22 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		return nil, validateErr
 	}
 
-	txType, validateErr := validateTxType(request.Metadata)
+	constructionType, validateErr := validateConstructionType(request.Metadata)
 	if validateErr != nil {
 		return nil, validateErr
 	}
 	unsignedTxBuilderFactory := factory.UnsignedTxBuilderFactory{}
 	inputOperations, outputOperations := separateInputAndOutput(request.Operations)
-	unsignedTxBuilder := unsignedTxBuilderFactory.CreateUnsignedTxBuilder(txType, s.cfg, inputOperations, outputOperations)
+	unsignedTxBuilder := unsignedTxBuilderFactory.CreateUnsignedTxBuilder(constructionType, s.cfg, inputOperations, outputOperations)
 	if unsignedTxBuilder == nil {
-		return nil, wrapErr(UnsupportedTxTypeError, fmt.Errorf("unsupported tx type: %s", txType))
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", constructionType))
 	}
 	unsignedTx, err := unsignedTxBuilder.Build()
 	if err != nil {
 		return nil, wrapErr(UnsignedTxBuildError, err)
 	}
 	signingPayloadBuilderFactory := factory.SigningPayloadBuilderFactory{}
-	signingPayloadBuilder := signingPayloadBuilderFactory.CreateSigningPayloadBuilder(txType)
+	signingPayloadBuilder := signingPayloadBuilderFactory.CreateSigningPayloadBuilder(constructionType)
 	payloads, err := signingPayloadBuilder.BuildSigningPayload(inputOperations, unsignedTx)
 	if err != nil {
 		return nil, wrapErr(SigningPayloadBuildError, err)
@@ -172,8 +171,11 @@ func (s *ConstructionAPIService) ConstructionCombine(
 	request *types.ConstructionCombineRequest,
 ) (*types.ConstructionCombineResponse, *types.Error) {
 	unsignedTxCombinerFactory := factory.SignedTxBuilder{}
-	txType := ckb.Secp256k1Tx
-	signedTxBuilder := unsignedTxCombinerFactory.CreateSignedTxBuilder(txType)
+	constructionType, validateErr := getConstructionType(nil, request.Signatures, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	signedTxBuilder := unsignedTxCombinerFactory.CreateSignedTxBuilder(constructionType)
 	signedTxStr, err := signedTxBuilder.Combine(request.UnsignedTransaction, request.Signatures)
 	if err != nil {
 		return nil, wrapErr(SignedTxBuildError, err)

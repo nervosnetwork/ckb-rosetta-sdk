@@ -156,9 +156,9 @@ var (
 		Retriable: false,
 	}
 
-	UnsupportedTxTypeError = &types.Error{
+	UnsupportedConstructionTypeError = &types.Error{
 		Code:      26,
-		Message:   "unsupported transaction type error.",
+		Message:   "unsupported construction type error.",
 		Retriable: false,
 	}
 
@@ -192,6 +192,18 @@ var (
 		Retriable: false,
 	}
 
+	TransactionParseError = &types.Error{
+		Code:      32,
+		Message:   "transaction parse error.",
+		Retriable: false,
+	}
+
+	InvalidAccountIdentifierMetadataError = &types.Error{
+		Code:      33,
+		Message:   "invalid account identifier metadata error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -203,8 +215,8 @@ var (
 		ckb.RewardOpType,
 	}
 
-	SupportedTxTypes = map[string]bool{
-		ckb.Secp256k1Tx: true,
+	SupportedConstructionTypes = map[string]bool{
+		ckb.TransferCKB: true,
 	}
 
 	MinCapacity   uint64 = 6100000000
@@ -233,12 +245,14 @@ var (
 		InvalidConstructionMetadataError,
 		InvalidOperationMetadataError,
 		DataParseError,
-		UnsupportedTxTypeError,
+		UnsupportedConstructionTypeError,
 		ScriptHashComputedError,
 		UnsignedTxBuildError,
 		SignMessagesBuildError,
 		SigningPayloadBuildError,
 		SignedTxBuildError,
+		TransactionParseError,
+		InvalidAccountIdentifierMetadataError,
 	}
 )
 
