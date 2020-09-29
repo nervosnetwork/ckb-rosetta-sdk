@@ -1,5 +1,7 @@
 package ckb
 
+import ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
+
 const (
 	InputOpType              = "INPUT"
 	OutputOpType             = "OUTPUT"
@@ -11,23 +13,34 @@ const (
 	SerializedOffsetByteSize = 4
 	BytesInKb                = 1000
 	MinFeeRate               = 1000 // shannons/KB
-	Secp256k1Tx              = "Secp256k1Tx"
+	TransferCKB              = "TransferCKB"
 )
 
-type PreprocessMetadata struct {
-	TxType string `json:"tx_type"`
+const (
+	Secp256k1Blake160Lock LockType = iota
+)
+
+func (l LockType) String() string {
+	return [...]string{"Secp256k1Blake160Lock"}[l]
 }
 
+type LockType int
+
 type PreprocessOptions struct {
-	TxType                 string   `json:"tx_type"`
+	ConstructionType       string   `json:"construction_type"`
 	EstimatedTxSize        uint64   `json:"estimated_tx_size"`
 	SuggestedFeeMultiplier *float64 `json:"suggested_fee_multiplier"`
 }
 
 type ConstructionMetadata struct {
-	TxType string `json:"tx_type"`
+	ConstructionType string `json:"construction_type"`
 }
 
 type OperationMetadata struct {
-	Data string `json:"data"`
+	Data string           `json:"data"`
+	Type *ckbTypes.Script `json:"type"`
+}
+
+type AccountIdentifierMetadata struct {
+	LockType string `json:"lock_type"`
 }

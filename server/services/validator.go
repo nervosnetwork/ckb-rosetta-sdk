@@ -85,12 +85,12 @@ func validateInputOperations(operations []*types.Operation, cfg *config.Config) 
 	return inputTotalAmount, nil
 }
 
-func validateTxType(metadata map[string]interface{}) (string, *types.Error) {
+func validateConstructionType(metadata map[string]interface{}) (string, *types.Error) {
 	var constructionMetadata ckb.ConstructionMetadata
 	err := types.UnmarshalMap(metadata, &constructionMetadata)
 	if err != nil {
 		return "", InvalidConstructionMetadataError
 	}
 
-	return constructionMetadata.TxType, nil
+	return constructionMetadata.ConstructionType, nil
 }
