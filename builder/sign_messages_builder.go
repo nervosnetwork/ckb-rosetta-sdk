@@ -6,7 +6,7 @@ import (
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
-type SignMessagesBuilderInterface interface {
+type SignMessagesBuilder interface {
 	BuildSignMessages(tx *ckbTypes.Transaction, inputOperations []*types.Operation) ([][]byte, error)
 }
 

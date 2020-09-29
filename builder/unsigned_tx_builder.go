@@ -4,8 +4,8 @@ import (
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
-// UnsignedTxBuilder is an interface for different script unsignedTxBuilder
-type UnsignedTxBuilderInterface interface {
+// UnsignedTx is an interface for different script unsignedTxBuilder
+type UnsignedTxBuilder interface {
 	BuildVersion() (uint, error)
 	BuildCellDeps() ([]*ckbTypes.CellDep, error)
 	BuildHeaderDeps() ([]ckbTypes.Hash, error)
@@ -16,7 +16,7 @@ type UnsignedTxBuilderInterface interface {
 	Build() (*ckbTypes.Transaction, error)
 }
 
-type UnsignedTxBuilder struct {
+type UnsignedTx struct {
 	BuildVersion     func() (uint, error)
 	BuildCellDeps    func() ([]*ckbTypes.CellDep, error)
 	BuildHeaderDeps  func() ([]ckbTypes.Hash, error)
@@ -26,7 +26,7 @@ type UnsignedTxBuilder struct {
 	BuildWitnesses   func() ([][]byte, error)
 }
 
-func (utb UnsignedTxBuilder) Build() (*ckbTypes.Transaction, error) {
+func (utb UnsignedTx) Build() (*ckbTypes.Transaction, error) {
 	version, err := utb.BuildVersion()
 	cellDeps, err := utb.BuildCellDeps()
 	if err != nil {

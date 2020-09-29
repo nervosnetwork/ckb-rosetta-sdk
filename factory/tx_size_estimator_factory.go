@@ -11,7 +11,7 @@ import (
 
 type TxSizeEstimatorFactory struct{}
 
-func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(txType string) TxSizeEstimatorInterface {
+func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(txType string) TxSizeEstimater {
 	switch txType {
 	case ckb.Secp256k1Tx:
 		return NewSecp256k1TxSizeEstimator()
@@ -20,7 +20,7 @@ func (tf TxSizeEstimatorFactory) CreateTxSizeEstimator(txType string) TxSizeEsti
 	}
 }
 
-type TxSizeEstimatorInterface interface {
+type TxSizeEstimater interface {
 	EstimatedTxSize(operations []*types.Operation) (uint64, error)
 	HeaderDepsSize() uint64
 	CellDepsSize() uint64

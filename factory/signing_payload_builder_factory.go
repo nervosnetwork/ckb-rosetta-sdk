@@ -7,7 +7,7 @@ import (
 
 type SigningPayloadBuilderFactory struct{}
 
-func (f SigningPayloadBuilderFactory) CreateSigningPayloadBuilder(txType string) builder.SigningPayloadBuilderInterface {
+func (f SigningPayloadBuilderFactory) CreateSigningPayloadBuilder(txType string) builder.SigningPayloadBuilder {
 	switch txType {
 	case ckb.Secp256k1Tx:
 		sf := SignMessagesBuilderFactory{}

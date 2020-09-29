@@ -7,7 +7,7 @@ import (
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
-type SignedTxBuilderInterface interface {
+type SignedTxBuilder interface {
 	Combine(txStr string, signatures []*types.Signature) (signedTxStr string, err error)
 }
 

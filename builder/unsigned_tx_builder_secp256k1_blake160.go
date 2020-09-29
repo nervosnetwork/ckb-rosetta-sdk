@@ -8,12 +8,12 @@ import (
 	"strconv"
 )
 
-var _ UnsignedTxBuilderInterface = UnsignedTxBuilderSecp256k1{}
+var _ UnsignedTxBuilder = UnsignedTxBuilderSecp256k1{}
 
 const txVersion uint = 0
 
 type UnsignedTxBuilderSecp256k1 struct {
-	UnsignedTxBuilder
+	UnsignedTx
 	Cfg              *config.Config
 	InputOperations  []*types.Operation
 	OutputOperations []*types.Operation
@@ -25,13 +25,13 @@ func NewUnsignedTxBuilderSecp256k1(cfg *config.Config, inputOperations []*types.
 		InputOperations:  inputOperations,
 		OutputOperations: outputOperations,
 	}
-	b.UnsignedTxBuilder.BuildVersion = b.BuildVersion
-	b.UnsignedTxBuilder.BuildCellDeps = b.BuildCellDeps
-	b.UnsignedTxBuilder.BuildHeaderDeps = b.BuildHeaderDeps
-	b.UnsignedTxBuilder.BuildInputs = b.BuildInputs
-	b.UnsignedTxBuilder.BuildOutputs = b.BuildOutputs
-	b.UnsignedTxBuilder.BuildOutputsData = b.BuildOutputsData
-	b.UnsignedTxBuilder.BuildWitnesses = b.BuildWitnesses
+	b.UnsignedTx.BuildVersion = b.BuildVersion
+	b.UnsignedTx.BuildCellDeps = b.BuildCellDeps
+	b.UnsignedTx.BuildHeaderDeps = b.BuildHeaderDeps
+	b.UnsignedTx.BuildInputs = b.BuildInputs
+	b.UnsignedTx.BuildOutputs = b.BuildOutputs
+	b.UnsignedTx.BuildOutputsData = b.BuildOutputsData
+	b.UnsignedTx.BuildWitnesses = b.BuildWitnesses
 	return &b
 }
 

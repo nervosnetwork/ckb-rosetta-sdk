@@ -5,17 +5,17 @@ import (
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
-type SigningPayloadBuilderInterface interface {
+type SigningPayloadBuilder interface {
 	BuildSigningPayload(inputOperations []*types.Operation, unsignedTx *ckbTypes.Transaction) ([]*types.SigningPayload, error)
 }
 
-func NewSigningPayloadBuilderSecp256k1Blake160(txType string, signMessagesBuilder SignMessagesBuilderInterface) *SigningPayloadBuilderSecp256k1Blake160 {
+func NewSigningPayloadBuilderSecp256k1Blake160(txType string, signMessagesBuilder SignMessagesBuilder) *SigningPayloadBuilderSecp256k1Blake160 {
 	return &SigningPayloadBuilderSecp256k1Blake160{txType, signMessagesBuilder}
 }
 
 type SigningPayloadBuilderSecp256k1Blake160 struct {
 	TxType              string
-	signMessagesBuilder SignMessagesBuilderInterface
+	signMessagesBuilder SignMessagesBuilder
 }
 
 func (b SigningPayloadBuilderSecp256k1Blake160) BuildSigningPayload(inputOperations []*types.Operation, unsignedTx *ckbTypes.Transaction) ([]*types.SigningPayload, error) {

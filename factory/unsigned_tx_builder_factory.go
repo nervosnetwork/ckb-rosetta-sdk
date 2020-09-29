@@ -9,7 +9,7 @@ import (
 
 type UnsignedTxBuilderFactory struct{}
 
-func (f UnsignedTxBuilderFactory) CreateUnsignedTxBuilder(txType string, cfg *config.Config, inputOperations []*types.Operation, outputOperations []*types.Operation) builder.UnsignedTxBuilderInterface {
+func (f UnsignedTxBuilderFactory) CreateUnsignedTxBuilder(txType string, cfg *config.Config, inputOperations []*types.Operation, outputOperations []*types.Operation) builder.UnsignedTxBuilder {
 	switch txType {
 	case ckb.Secp256k1Tx:
 		return builder.NewUnsignedTxBuilderSecp256k1(cfg, inputOperations, outputOperations)
