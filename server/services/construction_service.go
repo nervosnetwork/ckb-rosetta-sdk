@@ -262,19 +262,11 @@ func (s *ConstructionAPIService) ConstructionHash(
 ) (*types.TransactionIdentifierResponse, *types.Error) {
 	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.SignedTransaction),
-			Retriable: false,
-		}
+		return nil, TransactionParseError
 	}
 	hash, err := tx.ComputeHash()
 	if err != nil {
-		return nil, &types.Error{
-			Code:      12,
-			Message:   fmt.Sprintf("compute hash error: %v", err),
-			Retriable: false,
-		}
+		return nil, wrapErr(ComputeHashError, fmt.Errorf("error computing hash: %v", err))
 	}
 
 	return &types.TransactionIdentifierResponse{
