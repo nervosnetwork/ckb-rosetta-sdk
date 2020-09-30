@@ -2,6 +2,8 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
@@ -52,6 +54,38 @@ type inTransaction struct {
 	Outputs     []cellOutput    `json:"outputs"`
 	OutputsData []hexutil.Bytes `json:"outputs_data"`
 	Witnesses   []hexutil.Bytes `json:"witnesses"`
+}
+
+type inRosettaTransaction struct {
+	Version                  hexutil.Uint               `json:"version"`
+	Hash                     ckbTypes.Hash              `json:"hash"`
+	CellDeps                 []cellDep                  `json:"cell_deps"`
+	HeaderDeps               []ckbTypes.Hash            `json:"header_deps"`
+	Inputs                   []cellInput                `json:"inputs"`
+	Outputs                  []cellOutput               `json:"outputs"`
+	OutputsData              []hexutil.Bytes            `json:"outputs_data"`
+	Witnesses                []hexutil.Bytes            `json:"witnesses"`
+	InputAmounts             []*types.Amount            `json:"input_amounts"`
+	InputAccounts            []*types.AccountIdentifier `json:"input_accounts"`
+	OutputAmounts            []*types.Amount            `json:"output_amounts"`
+	OutputAccounts           []*types.AccountIdentifier `json:"output_accounts"`
+	AccountIdentifierSigners []*types.AccountIdentifier `json:"account_identifier_signers,omitempty"`
+}
+
+type rosettaTransaction struct {
+	Version                  uint                       `json:"version"`
+	Hash                     ckbTypes.Hash              `json:"hash"`
+	CellDeps                 []*ckbTypes.CellDep        `json:"cell_deps"`
+	HeaderDeps               []ckbTypes.Hash            `json:"header_deps"`
+	Inputs                   []*ckbTypes.CellInput      `json:"inputs"`
+	Outputs                  []*ckbTypes.CellOutput     `json:"outputs"`
+	OutputsData              [][]byte                   `json:"outputs_data"`
+	Witnesses                [][]byte                   `json:"witnesses"`
+	InputAmounts             []*types.Amount            `json:"input_amounts"`
+	InputAccounts            []*types.AccountIdentifier `json:"input_accounts"`
+	OutputAmounts            []*types.Amount            `json:"output_amounts"`
+	OutputAccounts           []*types.AccountIdentifier `json:"output_accounts"`
+	AccountIdentifierSigners []*types.AccountIdentifier `json:"account_identifier_signers,omitempty"`
 }
 
 func ToTransaction(data string) (*ckbTypes.Transaction, error) {
@@ -208,4 +242,10 @@ func fromBytesArray(bytes [][]byte) []hexutil.Bytes {
 		result[i] = data
 	}
 	return result
+}
+
+func getCoinIdentifier(outPoint *ckbTypes.OutPoint) *types.CoinIdentifier {
+	return &types.CoinIdentifier{
+		Identifier: fmt.Sprintf("%s:%d", outPoint.TxHash.String(), outPoint.Index),
+	}
 }
