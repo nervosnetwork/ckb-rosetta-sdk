@@ -216,6 +216,12 @@ var (
 		Retriable: false,
 	}
 
+	InvalidDeriveMetadataError = &types.Error{
+		Code:      36,
+		Message:   "invalid derive metadata error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,

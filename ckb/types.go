@@ -44,3 +44,12 @@ type OperationMetadata struct {
 type AccountIdentifierMetadata struct {
 	LockType string `json:"lock_type"`
 }
+
+type Script struct {
+	CodeHash string `json:"code_hash"`
+	HashType string `json:"hash_type"`
+	Args     string `json:"args"`
+}
+type DeriveMetadata struct {
+	Script `json:"script"`
+}

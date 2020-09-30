@@ -1,10 +1,12 @@
 package services
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
@@ -248,4 +250,17 @@ func getCoinIdentifier(outPoint *ckbTypes.OutPoint) *types.CoinIdentifier {
 	return &types.CoinIdentifier{
 		Identifier: fmt.Sprintf("%s:%d", outPoint.TxHash.String(), outPoint.Index),
 	}
+}
+
+func toScript(s ckb.Script) (*ckbTypes.Script, error) {
+	args, err := hex.DecodeString(s.Args[2:])
+	if err != nil {
+		return nil, err
+	}
+
+	return &ckbTypes.Script{
+		CodeHash: ckbTypes.HexToHash(s.CodeHash),
+		HashType: ckbTypes.ScriptHashType(s.HashType),
+		Args:     args,
+	}, nil
 }
