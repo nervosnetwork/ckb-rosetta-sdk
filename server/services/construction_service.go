@@ -12,7 +12,6 @@ import (
 	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
 	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
-	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIService interface.
@@ -261,35 +260,32 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		return nil, UnsupportedCurveTypeError
 	}
 
-	args, err := blake2b.Blake160(request.PublicKey.Bytes)
+	_, err := blake2b.Blake160(request.PublicKey.Bytes)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
-		}
+		return nil, wrapErr(ServerError, err)
 	}
 
 	prefix := address.Mainnet
 	if s.network.Network != "Mainnet" {
 		prefix = address.Testnet
 	}
-
-	_, err = address.Generate(prefix, &ckbTypes.Script{
-		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
-		HashType: ckbTypes.HashTypeType,
-		Args:     args,
-	})
+	var metadata ckb.DeriveMetadata
+	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
+		return nil, wrapErr(InvalidDeriveMetadataError, err)
+	}
+	script, err := toScript(metadata.Script)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
-		}
+		return nil, wrapErr(ServerError, err)
+	}
+	addr, err := address.Generate(prefix, script)
+	if err != nil {
+		return nil, wrapErr(ServerError, err)
 	}
 
 	return &types.ConstructionDeriveResponse{
-		AccountIdentifier: nil,
+		AccountIdentifier: &types.AccountIdentifier{
+			Address: addr,
+		},
 	}, nil
 }
 
