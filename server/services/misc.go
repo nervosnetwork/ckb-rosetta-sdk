@@ -204,6 +204,18 @@ var (
 		Retriable: false,
 	}
 
+	ComputeHashError = &types.Error{
+		Code:      34,
+		Message:   "compute hash error.",
+		Retriable: false,
+	}
+
+	AddressGenerationError = &types.Error{
+		Code:      35,
+		Message:   "Address generation error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -253,6 +265,7 @@ var (
 		SignedTxBuildError,
 		TransactionParseError,
 		InvalidAccountIdentifierMetadataError,
+		AddressGenerationError,
 	}
 )
 

@@ -159,8 +159,9 @@ func (s *ConstructionAPIService) ConstructionPayloads(
 		return nil, wrapErr(SigningPayloadBuildError, err)
 	}
 	txString, err := ckbRpc.TransactionString(unsignedTx)
+	rTxStr, validateErr := rTxStringForPayload(txString, request.Operations)
 	return &types.ConstructionPayloadsResponse{
-		UnsignedTransaction: txString,
+		UnsignedTransaction: rTxStr,
 		Payloads:            payloads,
 	}, nil
 }
@@ -180,8 +181,23 @@ func (s *ConstructionAPIService) ConstructionCombine(
 	if err != nil {
 		return nil, wrapErr(SignedTxBuildError, err)
 	}
+	rTx, err := rosettaTransactionFromString(request.UnsignedTransaction)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
+	}
+	signedTx, err := ckbRpc.TransactionFromString(signedTxStr)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
+	}
+	rTx.Witnesses = signedTx.Witnesses
+	rTxStr, err := rTxString(rTx)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
+	}
+
+	signedRtx, validateErr := rTxStringForCombine(rTxStr, request.Signatures)
 	return &types.ConstructionCombineResponse{
-		SignedTransaction: signedTxStr,
+		SignedTransaction: signedRtx,
 	}, nil
 }
 
@@ -190,69 +206,7 @@ func (s *ConstructionAPIService) ConstructionParse(
 	ctx context.Context,
 	request *types.ConstructionParseRequest,
 ) (*types.ConstructionParseResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.Transaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.Transaction),
-			Retriable: false,
-		}
-	}
-
-	signers := make(map[string]bool)
-	index := int64(0)
-	operations := make([]*types.Operation, 0)
-	for _, input := range tx.Inputs {
-		ptx, err := s.client.GetTransaction(ctx, input.PreviousOutput.TxHash)
-		if err != nil {
-			return nil, ServerError
-		}
-
-		addr := GenerateAddress(s.network, ptx.Transaction.Outputs[input.PreviousOutput.Index].Lock)
-		signers[addr] = true
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
-			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: addr,
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%d", ptx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
-				Currency: CkbCurrency,
-			},
-		})
-		index++
-	}
-	for _, output := range tx.Outputs {
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
-			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: GenerateAddress(s.network, output.Lock),
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("%d", output.Capacity),
-				Currency: CkbCurrency,
-			},
-		})
-		index++
-	}
-
-	addresses := make([]string, 0, len(signers))
-	for addr := range signers {
-		addresses = append(addresses, addr)
-	}
-
-	return &types.ConstructionParseResponse{
-		Operations:               operations,
-		AccountIdentifierSigners: nil,
-	}, nil
+	return s.parseTransaction(request)
 }
 
 // ConstructionHash implements the /construction/hash endpoint.
@@ -336,5 +290,41 @@ func (s *ConstructionAPIService) ConstructionDerive(
 
 	return &types.ConstructionDeriveResponse{
 		AccountIdentifier: nil,
+	}, nil
+}
+
+func (s *ConstructionAPIService) parseTransaction(request *types.ConstructionParseRequest) (*types.ConstructionParseResponse, *types.Error) {
+	signedTx, err := rosettaTransactionFromString(request.Transaction)
+	if err != nil {
+		return nil, TransactionParseError
+	}
+	var operations []*types.Operation
+
+	for i, input := range signedTx.Inputs {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{Index: int64(len(operations))},
+			Type:                ckb.InputOpType,
+			Account:             signedTx.InputAccounts[i],
+			Amount:              signedTx.InputAmounts[i],
+			CoinChange: &types.CoinChange{
+				CoinIdentifier: getCoinIdentifier(input.PreviousOutput),
+				CoinAction:     types.CoinSpent,
+			},
+		})
+	}
+	for i := range signedTx.Outputs {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: int64(len(operations)),
+			},
+			Type:    ckb.OutputOpType,
+			Account: signedTx.OutputAccounts[i],
+			Amount:  signedTx.OutputAmounts[i],
+		})
+	}
+
+	return &types.ConstructionParseResponse{
+		Operations:               operations,
+		AccountIdentifierSigners: signedTx.AccountIdentifierSigners,
 	}, nil
 }
