@@ -1,10 +1,13 @@
 package services
 
 import (
+	"encoding/json"
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 	"github.com/nervosnetwork/ckb-sdk-go/address"
+	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
@@ -110,4 +113,132 @@ func isTransferCKB(inputOperations []*types.Operation, outputOperations []*types
 	}
 
 	return true, nil
+}
+
+func toRosettaTransaction(rTx inRosettaTransaction) *rosettaTransaction {
+	return &rosettaTransaction{
+		Version:                  uint(rTx.Version),
+		Hash:                     ckbTypes.Hash{},
+		CellDeps:                 toCellDeps(rTx.CellDeps),
+		HeaderDeps:               rTx.HeaderDeps,
+		Inputs:                   toInputs(rTx.Inputs),
+		Outputs:                  toOutputs(rTx.Outputs),
+		OutputsData:              toBytesArray(rTx.OutputsData),
+		Witnesses:                toBytesArray(rTx.Witnesses),
+		InputAmounts:             rTx.InputAmounts,
+		InputAccounts:            rTx.InputAccounts,
+		OutputAmounts:            rTx.OutputAmounts,
+		OutputAccounts:           rTx.OutputAccounts,
+		AccountIdentifierSigners: rTx.AccountIdentifierSigners,
+	}
+}
+
+func rosettaTransactionFromString(tx string) (*rosettaTransaction, error) {
+	var rTx inRosettaTransaction
+	err := json.Unmarshal([]byte(tx), &rTx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toRosettaTransaction(rTx), nil
+}
+
+func rTxStringForPayload(txStr string, operations []*types.Operation) (string, *types.Error) {
+	var inputAmounts []*types.Amount
+	var inputAccounts []*types.AccountIdentifier
+	inputOperations := getInputOperations(operations)
+	for _, inputOperation := range inputOperations {
+		inputAmounts = append(inputAmounts, inputOperation.Amount)
+		inputAccounts = append(inputAccounts, inputOperation.Account)
+	}
+	var outputAmounts []*types.Amount
+	var outputAccounts []*types.AccountIdentifier
+	outputOperations := getOutputOperations(operations)
+	for _, outputOperation := range outputOperations {
+		outputAmounts = append(outputAmounts, outputOperation.Amount)
+		outputAccounts = append(outputAccounts, outputOperation.Account)
+	}
+	tx, err := ckbRpc.TransactionFromString(txStr)
+	if err != nil {
+		return "", TransactionParseError
+	}
+	rTx := inRosettaTransaction{
+		Version:                  hexutil.Uint(tx.Version),
+		Hash:                     tx.Hash,
+		CellDeps:                 fromCellDeps(tx.CellDeps),
+		HeaderDeps:               tx.HeaderDeps,
+		Inputs:                   fromInputs(tx.Inputs),
+		Outputs:                  fromOutputs(tx.Outputs),
+		OutputsData:              fromBytesArray(tx.OutputsData),
+		Witnesses:                fromBytesArray(tx.Witnesses),
+		InputAmounts:             inputAmounts,
+		InputAccounts:            inputAccounts,
+		OutputAmounts:            outputAmounts,
+		OutputAccounts:           outputAccounts,
+		AccountIdentifierSigners: []*types.AccountIdentifier{},
+	}
+	bytes, err := json.Marshal(rTx)
+	if err != nil {
+		return "", wrapErr(TransactionParseError, err)
+	}
+
+	return string(bytes), nil
+}
+
+func rTxStringForCombine(txStr string, signatures []*types.Signature) (string, *types.Error) {
+	rTx, err := rosettaTransactionFromString(txStr)
+	if err != nil {
+		return "", TransactionParseError
+	}
+	var accountIdentifierSigners []*types.AccountIdentifier
+	for _, signature := range signatures {
+		accountIdentifierSigners = append(accountIdentifierSigners, signature.SigningPayload.AccountIdentifier)
+	}
+	inRtx := inRosettaTransaction{
+		Version:                  hexutil.Uint(rTx.Version),
+		Hash:                     rTx.Hash,
+		CellDeps:                 fromCellDeps(rTx.CellDeps),
+		HeaderDeps:               rTx.HeaderDeps,
+		Inputs:                   fromInputs(rTx.Inputs),
+		Outputs:                  fromOutputs(rTx.Outputs),
+		OutputsData:              fromBytesArray(rTx.OutputsData),
+		Witnesses:                fromBytesArray(rTx.Witnesses),
+		InputAmounts:             rTx.InputAmounts,
+		InputAccounts:            rTx.InputAccounts,
+		OutputAmounts:            rTx.OutputAmounts,
+		OutputAccounts:           rTx.OutputAccounts,
+		AccountIdentifierSigners: accountIdentifierSigners,
+	}
+
+	bytes, err := json.Marshal(inRtx)
+	if err != nil {
+		return "", wrapErr(TransactionParseError, err)
+	}
+
+	return string(bytes), nil
+}
+
+func rTxString(rTx *rosettaTransaction) (string, error) {
+	iRtx := inRosettaTransaction{
+		Version:                  hexutil.Uint(rTx.Version),
+		Hash:                     rTx.Hash,
+		CellDeps:                 fromCellDeps(rTx.CellDeps),
+		HeaderDeps:               rTx.HeaderDeps,
+		Inputs:                   fromInputs(rTx.Inputs),
+		Outputs:                  fromOutputs(rTx.Outputs),
+		OutputsData:              fromBytesArray(rTx.OutputsData),
+		Witnesses:                fromBytesArray(rTx.Witnesses),
+		InputAmounts:             rTx.InputAmounts,
+		InputAccounts:            rTx.InputAccounts,
+		OutputAmounts:            rTx.OutputAmounts,
+		OutputAccounts:           rTx.OutputAccounts,
+		AccountIdentifierSigners: []*types.AccountIdentifier{},
+	}
+
+	bytes, err := json.Marshal(iRtx)
+	if err != nil {
+		return "", err
+	}
+
+	return string(bytes), nil
 }
