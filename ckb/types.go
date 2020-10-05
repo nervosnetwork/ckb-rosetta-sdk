@@ -14,6 +14,7 @@ const (
 	BytesInKb                = 1000
 	MinFeeRate               = 1000 // shannons/KB
 	TransferCKB              = "TransferCKB"
+	SearchLimit              = 1000
 )
 
 const (

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -37,25 +38,51 @@ func (s *AccountAPIService) AccountBalance(
 	if err != nil {
 		return nil, AddressParseError
 	}
+	var cursor string
+	var ckbBalance uint64
+	var ckbCoins []*types.Coin
+	for {
+		liveCells, err := s.client.GetCells(context.Background(), &indexer.SearchKey{
+			Script:     addr.Script,
+			ScriptType: indexer.ScriptTypeLock,
+		}, indexer.SearchOrderAsc, ckb.SearchLimit, cursor)
+		if err != nil {
+			return nil, wrapErr(ServerError, err)
+		}
+		for _, cell := range liveCells.Objects {
+			if cell.Output.Type == nil && len(cell.OutputData) == 0 {
+				ckbBalance += cell.Output.Capacity
+				ckbCoins = append(ckbCoins, &types.Coin{
+					CoinIdentifier: &types.CoinIdentifier{Identifier: fmt.Sprintf("%s:%d", cell.OutPoint.TxHash, cell.OutPoint.Index)},
+					Amount: &types.Amount{
+						Value:    fmt.Sprintf("%d", cell.Output.Capacity),
+						Currency: CkbCurrency,
+					},
+				})
+			}
+		}
+		if len(liveCells.Objects) < ckb.SearchLimit || liveCells.LastCursor == "" {
+			break
+		}
+		cursor = liveCells.LastCursor
+	}
 
-	capacity, err := s.client.GetCellsCapacity(context.Background(), &indexer.SearchKey{
-		Script:     addr.Script,
-		ScriptType: indexer.ScriptTypeLock,
-	})
+	tipHeader, err := s.client.GetTipHeader(context.Background())
 	if err != nil {
-		return nil, RpcError
+		return nil, wrapErr(RpcError, err)
 	}
 
 	return &types.AccountBalanceResponse{
 		BlockIdentifier: &types.BlockIdentifier{
-			Index: int64(capacity.BlockNumber),
-			Hash:  capacity.BlockHash.String(),
+			Index: int64(tipHeader.Number),
+			Hash:  tipHeader.Hash.String(),
 		},
 		Balances: []*types.Amount{
 			{
-				Value:    fmt.Sprintf("%d", capacity.Capacity),
+				Value:    fmt.Sprintf("%d", ckbBalance),
 				Currency: CkbCurrency,
 			},
 		},
+		Coins: ckbCoins,
 	}, nil
 }
