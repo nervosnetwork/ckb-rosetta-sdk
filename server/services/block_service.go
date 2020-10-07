@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -157,7 +158,7 @@ func (s *BlockAPIService) Block(
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
 					},
-					Type:   "Transfer",
+					Type:   ckb.InputOpType,
 					Status: "Success",
 					Account: &types.AccountIdentifier{
 						Address: GenerateAddress(s.network, tx.Transaction.Outputs[input.PreviousOutput.Index].Lock),
@@ -174,7 +175,7 @@ func (s *BlockAPIService) Block(
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
 					},
-					Type:   "Transfer",
+					Type:   ckb.OutputOpType,
 					Status: "Success",
 					Account: &types.AccountIdentifier{
 						Address: GenerateAddress(s.network, output.Lock),
@@ -250,7 +251,7 @@ func (s *BlockAPIService) BlockTransaction(
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: optIndex,
 				},
-				Type:   "Transfer",
+				Type:   ckb.OutputOpType,
 				Status: "Success",
 				Account: &types.AccountIdentifier{
 					Address: GenerateAddress(s.network, output.Lock),
@@ -301,7 +302,7 @@ func (s *BlockAPIService) processTxInputs(inputs []*typesCKB.CellInput, optIndex
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: optIndex,
 			},
-			Type:   "Transfer",
+			Type:   ckb.InputOpType,
 			Status: "Success",
 			Account: &types.AccountIdentifier{
 				Address: GenerateAddress(s.network, req.Result.Transaction.Outputs[input.PreviousOutput.Index].Lock),
