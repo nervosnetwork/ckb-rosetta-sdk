@@ -12,6 +12,7 @@ import (
 	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
 	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
 // ConstructionAPIService implements the server.ConstructionAPIService interface.
@@ -260,7 +261,7 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		return nil, UnsupportedCurveTypeError
 	}
 
-	_, err := blake2b.Blake160(request.PublicKey.Bytes)
+	args, err := blake2b.Blake160(request.PublicKey.Bytes)
 	if err != nil {
 		return nil, wrapErr(ServerError, err)
 	}
@@ -269,14 +270,25 @@ func (s *ConstructionAPIService) ConstructionDerive(
 	if s.network.Network != "Mainnet" {
 		prefix = address.Testnet
 	}
-	var metadata ckb.DeriveMetadata
-	if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
-		return nil, wrapErr(InvalidDeriveMetadataError, err)
+
+	var script *ckbTypes.Script
+	if request.Metadata != nil {
+		var metadata ckb.DeriveMetadata
+		if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
+			return nil, wrapErr(InvalidDeriveMetadataError, err)
+		}
+		script, err = toScript(metadata.Script)
+		if err != nil {
+			return nil, wrapErr(ServerError, err)
+		}
+	} else {
+		script = &ckbTypes.Script{
+			CodeHash: ckbTypes.HexToHash(s.cfg.Secp256k1Blake160.Script.CodeHash),
+			HashType: ckbTypes.ScriptHashType(s.cfg.Secp256k1Blake160.Script.HashType),
+			Args:     args,
+		}
 	}
-	script, err := toScript(metadata.Script)
-	if err != nil {
-		return nil, wrapErr(ServerError, err)
-	}
+
 	addr, err := address.Generate(prefix, script)
 	if err != nil {
 		return nil, wrapErr(ServerError, err)
