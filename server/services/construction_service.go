@@ -237,12 +237,12 @@ func (s *ConstructionAPIService) ConstructionSubmit(
 ) (*types.TransactionIdentifierResponse, *types.Error) {
 	tx, err := ToTransaction(request.SignedTransaction)
 	if err != nil {
-		return nil, SubmitError
+		return nil, wrapErr(SubmitError, err)
 	}
 
 	hash, err := s.client.SendTransaction(ctx, tx)
 	if err != nil {
-		return nil, SubmitError
+		return nil, wrapErr(SubmitError, err)
 	}
 
 	return &types.TransactionIdentifierResponse{
