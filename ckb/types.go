@@ -19,10 +19,12 @@ const (
 
 const (
 	Secp256k1Blake160Lock LockType = iota
+	Secp256k1Blake160Multisig
+	UnknownLock
 )
 
 func (l LockType) String() string {
-	return [...]string{"Secp256k1Blake160Lock"}[l]
+	return [...]string{"Secp256k1Blake160Lock", "Secp256k1Blake160Multisig"}[l]
 }
 
 type LockType int

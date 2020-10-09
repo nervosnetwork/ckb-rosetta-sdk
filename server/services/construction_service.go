@@ -272,6 +272,7 @@ func (s *ConstructionAPIService) ConstructionDerive(
 	}
 
 	var script *ckbTypes.Script
+	var lockType string
 	if request.Metadata != nil {
 		var metadata ckb.DeriveMetadata
 		if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
@@ -281,12 +282,14 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		if err != nil {
 			return nil, wrapErr(ServerError, err)
 		}
+		lockType = getLockType(script, s.cfg)
 	} else {
 		script = &ckbTypes.Script{
 			CodeHash: ckbTypes.HexToHash(s.cfg.Secp256k1Blake160.Script.CodeHash),
 			HashType: ckbTypes.ScriptHashType(s.cfg.Secp256k1Blake160.Script.HashType),
 			Args:     args,
 		}
+		lockType = ckb.Secp256k1Blake160Lock.String()
 	}
 
 	addr, err := address.Generate(prefix, script)
@@ -294,9 +297,14 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		return nil, wrapErr(ServerError, err)
 	}
 
+	metadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+		LockType: lockType,
+	})
+
 	return &types.ConstructionDeriveResponse{
 		AccountIdentifier: &types.AccountIdentifier{
-			Address: addr,
+			Address:  addr,
+			Metadata: metadata,
 		},
 	}, nil
 }

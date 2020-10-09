@@ -38,8 +38,8 @@ func validateOutputOperations(operations []*types.Operation, cfg *config.Config)
 		if err != nil {
 			return 0, AddressParseError
 		}
-		if isBlake160SighashAllLock(addr, cfg) {
-			if i == operationSize-1 {
+		if isBlake160SighashAllLock(addr.Script, cfg) {
+			if i == operationSize-1 && amount == 0 {
 				continue
 			}
 			if amount < MinCapacity {
@@ -76,7 +76,7 @@ func validateInputOperations(operations []*types.Operation, cfg *config.Config) 
 			return 0, AddressParseError
 		}
 		// do not support send to multisig all lock
-		if isBlake160MultisigAllLock(addr, cfg) {
+		if isBlake160MultisigAllLock(addr.Script, cfg) {
 			return 0, NotSupportMultisigAllLockError
 		}
 

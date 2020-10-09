@@ -21,14 +21,14 @@ func operationFilter(arr []*types.Operation, cond func(*types.Operation) bool) [
 	return result
 }
 
-func isBlake160SighashAllLock(addr *address.ParsedAddress, cfg *config.Config) bool {
-	return addr.Script.HashType == ckbTypes.HashTypeType &&
-		addr.Script.CodeHash.String() == cfg.Secp256k1Blake160.Script.CodeHash
+func isBlake160SighashAllLock(script *ckbTypes.Script, cfg *config.Config) bool {
+	return script.HashType == ckbTypes.HashTypeType &&
+		script.CodeHash.String() == cfg.Secp256k1Blake160.Script.CodeHash
 }
 
-func isBlake160MultisigAllLock(addr *address.ParsedAddress, cfg *config.Config) bool {
-	return addr.Script.HashType == ckbTypes.HashTypeType &&
-		addr.Script.CodeHash.String() == cfg.Secp256k1Blake160Mutisig.Script.CodeHash
+func isBlake160MultisigAllLock(script *ckbTypes.Script, cfg *config.Config) bool {
+	return script.HashType == ckbTypes.HashTypeType &&
+		script.CodeHash.String() == cfg.Secp256k1Blake160Mutisig.Script.CodeHash
 }
 
 func wrapErr(rErr *types.Error, err error) *types.Error {
@@ -241,4 +241,14 @@ func rTxString(rTx *rosettaTransaction) (string, error) {
 	}
 
 	return string(bytes), nil
+}
+
+func getLockType(script *ckbTypes.Script, cfg *config.Config) string {
+	if isBlake160SighashAllLock(script, cfg) {
+		return ckb.Secp256k1Blake160Lock.String()
+	} else if isBlake160MultisigAllLock(script, cfg) {
+		return ckb.Secp256k1Blake160Multisig.String()
+	} else {
+		return ckb.UnknownLock.String()
+	}
 }
