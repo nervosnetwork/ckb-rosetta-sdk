@@ -9,7 +9,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/nervosnetwork/ckb-sdk-go/rpc"
-	typesCKB "github.com/nervosnetwork/ckb-sdk-go/types"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
 // BlockAPIService implements the server.BlockAPIServicer interface.
@@ -33,7 +33,7 @@ func (s *BlockAPIService) Block(
 	ctx context.Context,
 	request *types.BlockRequest,
 ) (*types.BlockResponse, *types.Error) {
-	var block *typesCKB.Block
+	var block *ckbTypes.Block
 	var err error
 	if request.BlockIdentifier.Hash == nil || *request.BlockIdentifier.Hash == "" {
 		if *request.BlockIdentifier.Index < 0 {
@@ -41,7 +41,7 @@ func (s *BlockAPIService) Block(
 		}
 		block, err = s.client.GetBlockByNumber(context.Background(), uint64(*request.BlockIdentifier.Index))
 	} else {
-		block, err = s.client.GetBlock(context.Background(), typesCKB.HexToHash(*request.BlockIdentifier.Hash))
+		block, err = s.client.GetBlock(context.Background(), ckbTypes.HexToHash(*request.BlockIdentifier.Hash))
 	}
 	if err != nil {
 		return nil, RpcError
@@ -69,22 +69,22 @@ func (s *BlockAPIService) Block(
 		}
 	}
 
-	batchReq := make([]typesCKB.BatchTransactionItem, 0)
+	batchReq := make([]ckbTypes.BatchTransactionItem, 0)
 	txHashCache := make(map[string]bool)
 	for i, tx := range block.Transactions {
 		if i != 0 {
 			for _, input := range tx.Inputs {
 				if _, ok := txHashCache[input.PreviousOutput.TxHash.String()]; !ok {
 					txHashCache[input.PreviousOutput.TxHash.String()] = true
-					batchReq = append(batchReq, typesCKB.BatchTransactionItem{
+					batchReq = append(batchReq, ckbTypes.BatchTransactionItem{
 						Hash:   input.PreviousOutput.TxHash,
-						Result: &typesCKB.TransactionWithStatus{},
+						Result: &ckbTypes.TransactionWithStatus{},
 					})
 				}
 			}
 		}
 	}
-	inputTxCache := make(map[string]*typesCKB.TransactionWithStatus)
+	inputTxCache := make(map[string]*ckbTypes.TransactionWithStatus)
 	if len(batchReq) > 0 {
 		count := len(batchReq) / 2000
 		if len(batchReq)%2000 != 0 {
@@ -124,6 +124,12 @@ func (s *BlockAPIService) Block(
 					Operations: []*types.Operation{},
 				}
 				for _, output := range tx.Outputs {
+					accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+						LockType: getLockType(output.Lock, s.cfg),
+					})
+					if err != nil {
+						return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
+					}
 					transaction.Operations = append(transaction.Operations, &types.Operation{
 						OperationIdentifier: &types.OperationIdentifier{
 							Index: optIndex,
@@ -131,7 +137,8 @@ func (s *BlockAPIService) Block(
 						Type:   "Reward",
 						Status: "Success",
 						Account: &types.AccountIdentifier{
-							Address: GenerateAddress(s.network, output.Lock),
+							Address:  GenerateAddress(s.network, output.Lock),
+							Metadata: accountMetadata,
 						},
 						Amount: &types.Amount{
 							Value:    fmt.Sprintf("%d", output.Capacity),
@@ -154,6 +161,13 @@ func (s *BlockAPIService) Block(
 					return nil, ServerError
 				}
 
+				accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+					LockType: getLockType(tx.Transaction.Outputs[input.PreviousOutput.Index].Lock, s.cfg),
+				})
+				if err != nil {
+					return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
+				}
+
 				transaction.Operations = append(transaction.Operations, &types.Operation{
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
@@ -161,16 +175,27 @@ func (s *BlockAPIService) Block(
 					Type:   ckb.InputOpType,
 					Status: "Success",
 					Account: &types.AccountIdentifier{
-						Address: GenerateAddress(s.network, tx.Transaction.Outputs[input.PreviousOutput.Index].Lock),
+						Address:  GenerateAddress(s.network, tx.Transaction.Outputs[input.PreviousOutput.Index].Lock),
+						Metadata: accountMetadata,
 					},
 					Amount: &types.Amount{
 						Value:    fmt.Sprintf("-%d", tx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
 						Currency: CkbCurrency,
 					},
+					CoinChange: &types.CoinChange{
+						CoinIdentifier: getCoinIdentifier(input.PreviousOutput),
+						CoinAction:     types.CoinSpent,
+					},
 				})
 				optIndex++
 			}
-			for _, output := range tx.Outputs {
+			for i, output := range tx.Outputs {
+				accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+					LockType: getLockType(output.Lock, s.cfg),
+				})
+				if err != nil {
+					return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
+				}
 				transaction.Operations = append(transaction.Operations, &types.Operation{
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
@@ -178,11 +203,19 @@ func (s *BlockAPIService) Block(
 					Type:   ckb.OutputOpType,
 					Status: "Success",
 					Account: &types.AccountIdentifier{
-						Address: GenerateAddress(s.network, output.Lock),
+						Address:  GenerateAddress(s.network, output.Lock),
+						Metadata: accountMetadata,
 					},
 					Amount: &types.Amount{
 						Value:    fmt.Sprintf("%d", output.Capacity),
 						Currency: CkbCurrency,
+					},
+					CoinChange: &types.CoinChange{
+						CoinIdentifier: getCoinIdentifier(&ckbTypes.OutPoint{
+							TxHash: tx.Hash,
+							Index:  uint(i),
+						}),
+						CoinAction: types.CoinCreated,
 					},
 				})
 				optIndex++
@@ -201,7 +234,7 @@ func (s *BlockAPIService) BlockTransaction(
 	ctx context.Context,
 	request *types.BlockTransactionRequest,
 ) (*types.BlockTransactionResponse, *types.Error) {
-	tx, err := s.client.GetTransaction(context.Background(), typesCKB.HexToHash(request.TransactionIdentifier.Hash))
+	tx, err := s.client.GetTransaction(context.Background(), ckbTypes.HexToHash(request.TransactionIdentifier.Hash))
 	if err != nil {
 		return nil, RpcError
 	}
@@ -216,6 +249,12 @@ func (s *BlockAPIService) BlockTransaction(
 				Operations: []*types.Operation{},
 			}
 			for _, output := range tx.Transaction.Outputs {
+				accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+					LockType: getLockType(output.Lock, s.cfg),
+				})
+				if err != nil {
+					return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
+				}
 				transaction.Operations = append(transaction.Operations, &types.Operation{
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
@@ -223,7 +262,8 @@ func (s *BlockAPIService) BlockTransaction(
 					Type:   "Reward",
 					Status: "Success",
 					Account: &types.AccountIdentifier{
-						Address: GenerateAddress(s.network, output.Lock),
+						Address:  GenerateAddress(s.network, output.Lock),
+						Metadata: accountMetadata,
 					},
 					Amount: &types.Amount{
 						Value:    fmt.Sprintf("%d", output.Capacity),
@@ -246,7 +286,13 @@ func (s *BlockAPIService) BlockTransaction(
 		}
 		optIndex = index
 
-		for _, output := range tx.Transaction.Outputs {
+		for i, output := range tx.Transaction.Outputs {
+			accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+				LockType: getLockType(output.Lock, s.cfg),
+			})
+			if err != nil {
+				return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
+			}
 			transaction.Operations = append(transaction.Operations, &types.Operation{
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: optIndex,
@@ -254,11 +300,19 @@ func (s *BlockAPIService) BlockTransaction(
 				Type:   ckb.OutputOpType,
 				Status: "Success",
 				Account: &types.AccountIdentifier{
-					Address: GenerateAddress(s.network, output.Lock),
+					Address:  GenerateAddress(s.network, output.Lock),
+					Metadata: accountMetadata,
 				},
 				Amount: &types.Amount{
 					Value:    fmt.Sprintf("%d", output.Capacity),
 					Currency: CkbCurrency,
+				},
+				CoinChange: &types.CoinChange{
+					CoinIdentifier: getCoinIdentifier(&ckbTypes.OutPoint{
+						TxHash: tx.Transaction.Hash,
+						Index:  uint(i),
+					}),
+					CoinAction: types.CoinCreated,
 				},
 			})
 			optIndex++
@@ -279,12 +333,12 @@ func (s *BlockAPIService) BlockTransaction(
 	}, nil
 }
 
-func (s *BlockAPIService) processTxInputs(inputs []*typesCKB.CellInput, optIndex int64, transaction *types.Transaction) (int64, error) {
-	batchReq := make([]typesCKB.BatchTransactionItem, len(inputs))
+func (s *BlockAPIService) processTxInputs(inputs []*ckbTypes.CellInput, optIndex int64, transaction *types.Transaction) (int64, error) {
+	batchReq := make([]ckbTypes.BatchTransactionItem, len(inputs))
 	for i, input := range inputs {
-		batchReq[i] = typesCKB.BatchTransactionItem{
+		batchReq[i] = ckbTypes.BatchTransactionItem{
 			Hash:   input.PreviousOutput.TxHash,
-			Result: &typesCKB.TransactionWithStatus{},
+			Result: &ckbTypes.TransactionWithStatus{},
 		}
 	}
 
@@ -298,6 +352,13 @@ func (s *BlockAPIService) processTxInputs(inputs []*typesCKB.CellInput, optIndex
 		if req.Error != nil {
 			return 0, req.Error
 		}
+		accountMetadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+			LockType: getLockType(req.Result.Transaction.Outputs[input.PreviousOutput.Index].Lock, s.cfg),
+		})
+		if err != nil {
+			return 0, err
+		}
+
 		transaction.Operations = append(transaction.Operations, &types.Operation{
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: optIndex,
@@ -305,11 +366,16 @@ func (s *BlockAPIService) processTxInputs(inputs []*typesCKB.CellInput, optIndex
 			Type:   ckb.InputOpType,
 			Status: "Success",
 			Account: &types.AccountIdentifier{
-				Address: GenerateAddress(s.network, req.Result.Transaction.Outputs[input.PreviousOutput.Index].Lock),
+				Address:  GenerateAddress(s.network, req.Result.Transaction.Outputs[input.PreviousOutput.Index].Lock),
+				Metadata: accountMetadata,
 			},
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("-%d", req.Result.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
 				Currency: CkbCurrency,
+			},
+			CoinChange: &types.CoinChange{
+				CoinIdentifier: getCoinIdentifier(input.PreviousOutput),
+				CoinAction:     types.CoinSpent,
 			},
 		})
 		optIndex++
