@@ -7,9 +7,57 @@ import (
 )
 
 type Config struct {
-	Port        uint   `yaml:"port"`
-	Network     string `yaml:"network"`
-	RichNodeRpc string `yaml:"rich_node_rpc"`
+	Port              uint   `yaml:"port"`
+	Network           string `yaml:"network"`
+	RichNodeRpc       string `yaml:"rich_node_rpc"`
+	Secp256k1Blake160 struct {
+		Deps []struct {
+			TxHash  string `yaml:"txHash"`
+			Index   uint   `yaml:"index"`
+			DepType string `yaml:"depType"`
+		} `yaml:"deps"`
+		Script struct {
+			CodeHash string `yaml:"codeHash"`
+			HashType string `yaml:"hashType"`
+		} `yaml:"script"`
+	} `yaml:"secp256k1Blake160"`
+	Secp256k1Blake160Mutisig struct {
+		Deps []struct {
+			TxHash  string `yaml:"txHash"`
+			Index   uint   `yaml:"index"`
+			DepType string `yaml:"depType"`
+		} `yaml:"deps"`
+		Script struct {
+			CodeHash string `yaml:"codeHash"`
+			HashType string `yaml:"hashType"`
+		} `yaml:"script"`
+	} `yaml:"secp256k1Blake160Mutisig"`
+	ACP struct {
+		Deps []struct {
+			TxHash  string `yaml:"txHash"`
+			Index   uint   `yaml:"index"`
+			DepType string `yaml:"depType"`
+		} `yaml:"deps"`
+		Script struct {
+			CodeHash string `yaml:"codeHash"`
+			HashType string `yaml:"hashType"`
+		} `yaml:"script"`
+	} `yaml:"acp"`
+	UDT struct {
+		Deps []struct {
+			TxHash  string `yaml:"txHash"`
+			Index   uint   `yaml:"index"`
+			DepType string `yaml:"depType"`
+		} `yaml:"deps"`
+		Script struct {
+			CodeHash string `yaml:"codeHash"`
+			HashType string `yaml:"hashType"`
+		} `yaml:"script"`
+		Tokens map[string]struct {
+			Symbol  string `yaml:"symbol"`
+			Decimal int    `yaml:"decimal"`
+		} `yaml:"tokens"`
+	} `yaml:"udt"`
 }
 
 func Init(path string) (*Config, error) {

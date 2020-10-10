@@ -2,23 +2,26 @@ package services
 
 import (
 	"context"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
 )
 
-// NetworkAPIService implements the server.NetworkAPIServicer interface.
+// NetworkAPIService implements the server.NetworkAPIService interface.
 type NetworkAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewNetworkAPIService creates a new instance of a NetworkAPIService.
-func NewNetworkAPIService(network *types.NetworkIdentifier, client rpc.Client) server.NetworkAPIServicer {
+func NewNetworkAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.NetworkAPIServicer {
 	return &NetworkAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
 }
 
@@ -52,6 +55,9 @@ func (s *NetworkAPIService) NetworkStatus(
 		return nil, RpcError
 	}
 	nodeHeader, err := s.client.GetHeaderByNumber(context.Background(), header.BlockNumber)
+	if err != nil {
+		return nil, RpcError
+	}
 
 	result := &types.NetworkStatusResponse{
 		CurrentBlockIdentifier: &types.BlockIdentifier{
@@ -87,7 +93,7 @@ func (s *NetworkAPIService) NetworkOptions(
 
 	return &types.NetworkOptionsResponse{
 		Version: &types.Version{
-			RosettaVersion: "1.3.0",
+			RosettaVersion: "1.4.5",
 			NodeVersion:    node.Version,
 		},
 		Allow: &types.Allow{
@@ -97,16 +103,8 @@ func (s *NetworkAPIService) NetworkOptions(
 					Successful: true,
 				},
 			},
-			OperationTypes: []string{
-				"Transfer",
-				"Reward",
-			},
-			Errors: []*types.Error{
-				NoImplementError,
-				RpcError,
-				AddressError,
-				SubmitError,
-			},
+			OperationTypes: SupportedOperationTypes,
+			Errors:         AllErrorTypes,
 		},
 	}, nil
 }

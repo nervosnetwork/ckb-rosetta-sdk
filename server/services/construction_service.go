@@ -3,41 +3,166 @@ package services
 import (
 	"context"
 	"fmt"
-	"strconv"
-
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ququzone/ckb-rich-sdk-go/indexer"
-	"github.com/ququzone/ckb-rich-sdk-go/rpc"
-	"github.com/ququzone/ckb-sdk-go/address"
-	"github.com/ququzone/ckb-sdk-go/crypto/blake2b"
-	ckbRpc "github.com/ququzone/ckb-sdk-go/rpc"
-	ckbTransaction "github.com/ququzone/ckb-sdk-go/transaction"
-	ckbTypes "github.com/ququzone/ckb-sdk-go/types"
-	"github.com/ququzone/ckb-sdk-go/utils"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/factory"
+	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
+	"github.com/nervosnetwork/ckb-sdk-go/address"
+	"github.com/nervosnetwork/ckb-sdk-go/crypto/blake2b"
+	"github.com/nervosnetwork/ckb-sdk-go/rpc"
+	ckbRpc "github.com/nervosnetwork/ckb-sdk-go/rpc"
+	ckbTypes "github.com/nervosnetwork/ckb-sdk-go/types"
 )
 
-// ConstructionAPIService implements the server.ConstructionAPIServicer interface.
+// ConstructionAPIService implements the server.ConstructionAPIService interface.
 type ConstructionAPIService struct {
 	network *types.NetworkIdentifier
 	client  rpc.Client
+	cfg     *config.Config
 }
 
 // NewConstructionAPIService creates a new instance of a ConstructionAPIService.
-func NewConstructionAPIService(network *types.NetworkIdentifier, client rpc.Client) server.ConstructionAPIServicer {
+func NewConstructionAPIService(network *types.NetworkIdentifier, client rpc.Client, cfg *config.Config) server.ConstructionAPIServicer {
 	return &ConstructionAPIService{
 		network: network,
 		client:  client,
+		cfg:     cfg,
 	}
+}
+
+// ConstructionPreprocess implements the /construction/preprocess endpoint.
+func (s *ConstructionAPIService) ConstructionPreprocess(
+	ctx context.Context,
+	request *types.ConstructionPreprocessRequest,
+) (*types.ConstructionPreprocessResponse, *types.Error) {
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	validateErr = validateCapacity(inputTotalAmount, outputTotalAmount)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	constructionType, validateErr := getConstructionType(request.Operations, nil, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	txSizeEstimatorFactory := new(factory.TxSizeEstimatorFactory)
+	txSizeEstimator := txSizeEstimatorFactory.CreateTxSizeEstimator(constructionType)
+	if txSizeEstimator == nil {
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", constructionType))
+	}
+	estimatedTxSize, err := txSizeEstimator.EstimatedTxSize(request.Operations)
+	if err != nil {
+		return nil, wrapErr(DataParseError, err)
+	}
+
+	options, err := types.MarshalMap(&ckb.PreprocessOptions{
+		ConstructionType:       constructionType,
+		EstimatedTxSize:        estimatedTxSize,
+		SuggestedFeeMultiplier: request.SuggestedFeeMultiplier,
+	})
+	if err != nil {
+		return nil, InvalidPreprocessOptionsError
+	}
+
+	return &types.ConstructionPreprocessResponse{
+		Options: options,
+	}, nil
 }
 
 // ConstructionMetadata implements the /construction/metadata endpoint.
 func (s *ConstructionAPIService) ConstructionMetadata(
-	context.Context,
-	*types.ConstructionMetadataRequest,
+	ctx context.Context,
+	request *types.ConstructionMetadataRequest,
 ) (*types.ConstructionMetadataResponse, *types.Error) {
+	if request.Options == nil {
+		return nil, MissingOptionError
+	}
+
+	var options ckb.PreprocessOptions
+	if err := types.UnmarshalMap(request.Options, &options); err != nil {
+		return nil, InvalidPreprocessOptionsError
+	}
+	if !SupportedConstructionTypes[options.ConstructionType] {
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", options.ConstructionType))
+	}
+	shannonsPerKB := float64(ckb.MinFeeRate)
+	if options.SuggestedFeeMultiplier != nil {
+		shannonsPerKB *= *options.SuggestedFeeMultiplier
+	}
+	shannonsPerB := shannonsPerKB / ckb.BytesInKb
+	estimatedFee := shannonsPerB * float64(options.EstimatedTxSize)
+	suggestedFee := &types.Amount{
+		Value:    fmt.Sprintf("%d", uint64(estimatedFee)),
+		Currency: CkbCurrency,
+	}
+
+	metadata, err := types.MarshalMap(&ckb.ConstructionMetadata{
+		ConstructionType: options.ConstructionType,
+	})
+	if err != nil {
+		return nil, InvalidConstructionMetadataError
+	}
+
 	return &types.ConstructionMetadataResponse{
-		Metadata: map[string]interface{}{},
+		Metadata:     metadata,
+		SuggestedFee: []*types.Amount{suggestedFee},
+	}, nil
+}
+
+// ConstructionPayloads implements the /construction/payloads endpoint.
+func (s *ConstructionAPIService) ConstructionPayloads(
+	ctx context.Context,
+	request *types.ConstructionPayloadsRequest,
+) (*types.ConstructionPayloadsResponse, *types.Error) {
+	inputTotalAmount, validateErr := validateInputOperations(request.Operations, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	outputTotalAmount, validateErr := validateOutputOperations(request.Operations, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	validateErr = validateCapacity(inputTotalAmount, outputTotalAmount)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+
+	constructionType, validateErr := validateConstructionType(request.Metadata)
+	if validateErr != nil {
+		return nil, validateErr
+	}
+	unsignedTxBuilderFactory := factory.UnsignedTxBuilderFactory{}
+	inputOperations, outputOperations := separateInputAndOutput(request.Operations)
+	unsignedTxBuilder := unsignedTxBuilderFactory.CreateUnsignedTxBuilder(constructionType, s.cfg, inputOperations, outputOperations)
+	if unsignedTxBuilder == nil {
+		return nil, wrapErr(UnsupportedConstructionTypeError, fmt.Errorf("unsupported construction type: %s", constructionType))
+	}
+	unsignedTx, err := unsignedTxBuilder.Build()
+	if err != nil {
+		return nil, wrapErr(UnsignedTxBuildError, err)
+	}
+	signingPayloadBuilderFactory := factory.SigningPayloadBuilderFactory{}
+	signingPayloadBuilder := signingPayloadBuilderFactory.CreateSigningPayloadBuilder(constructionType)
+	payloads, err := signingPayloadBuilder.BuildSigningPayload(inputOperations, unsignedTx)
+	if err != nil {
+		return nil, wrapErr(SigningPayloadBuildError, err)
+	}
+	txString, err := ckbRpc.TransactionString(unsignedTx)
+	rTxStr, validateErr := rTxStringForPayload(txString, request.Operations)
+	return &types.ConstructionPayloadsResponse{
+		UnsignedTransaction: rTxStr,
+		Payloads:            payloads,
 	}, nil
 }
 
@@ -46,28 +171,84 @@ func (s *ConstructionAPIService) ConstructionCombine(
 	ctx context.Context,
 	request *types.ConstructionCombineRequest,
 ) (*types.ConstructionCombineResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.UnsignedTransaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.UnsignedTransaction),
-			Retriable: false,
-		}
+	unsignedTxCombinerFactory := factory.SignedTxBuilder{}
+	constructionType, validateErr := getConstructionType(nil, request.Signatures, s.cfg)
+	if validateErr != nil {
+		return nil, validateErr
 	}
-	index := 0
-	for i, witness := range tx.Witnesses {
-		if len(witness) != 0 {
-			tx.Witnesses[i] = request.Signatures[index].Bytes
-			index++
-		}
+	signedTxBuilder := unsignedTxCombinerFactory.CreateSignedTxBuilder(constructionType)
+	signedTxStr, err := signedTxBuilder.Combine(request.UnsignedTransaction, request.Signatures)
+	if err != nil {
+		return nil, wrapErr(SignedTxBuildError, err)
+	}
+	rTx, err := rosettaTransactionFromString(request.UnsignedTransaction)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
+	}
+	signedTx, err := ckbRpc.TransactionFromString(signedTxStr)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
+	}
+	rTx.Witnesses = signedTx.Witnesses
+	rTxStr, err := rTxString(rTx)
+	if err != nil {
+		return nil, wrapErr(TransactionParseError, err)
 	}
 
-	txString, err := ckbRpc.TransactionString(tx)
-	if err != nil {
-		return nil, ServerError
-	}
+	signedRtx, validateErr := rTxStringForCombine(rTxStr, request.Signatures)
 	return &types.ConstructionCombineResponse{
-		SignedTransaction: txString,
+		SignedTransaction: signedRtx,
+	}, nil
+}
+
+// ConstructionParse implements the /construction/parse endpoint.
+func (s *ConstructionAPIService) ConstructionParse(
+	ctx context.Context,
+	request *types.ConstructionParseRequest,
+) (*types.ConstructionParseResponse, *types.Error) {
+	return s.parseTransaction(request)
+}
+
+// ConstructionHash implements the /construction/hash endpoint.
+func (s *ConstructionAPIService) ConstructionHash(
+	ctx context.Context,
+	request *types.ConstructionHashRequest,
+) (*types.TransactionIdentifierResponse, *types.Error) {
+	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
+	if err != nil {
+		return nil, TransactionParseError
+	}
+	hash, err := tx.ComputeHash()
+	if err != nil {
+		return nil, wrapErr(ComputeHashError, fmt.Errorf("error computing hash: %v", err))
+	}
+
+	return &types.TransactionIdentifierResponse{
+		TransactionIdentifier: &types.TransactionIdentifier{
+			Hash: hash.String(),
+		},
+	}, nil
+}
+
+// ConstructionSubmit implements the /construction/submit endpoint.
+func (s *ConstructionAPIService) ConstructionSubmit(
+	ctx context.Context,
+	request *types.ConstructionSubmitRequest,
+) (*types.TransactionIdentifierResponse, *types.Error) {
+	tx, err := ToTransaction(request.SignedTransaction)
+	if err != nil {
+		return nil, wrapErr(SubmitError, err)
+	}
+
+	hash, err := s.client.SendTransaction(ctx, tx)
+	if err != nil {
+		return nil, wrapErr(SubmitError, err)
+	}
+
+	return &types.TransactionIdentifierResponse{
+		TransactionIdentifier: &types.TransactionIdentifier{
+			Hash: hash.String(),
+		},
 	}, nil
 }
 
@@ -82,11 +263,7 @@ func (s *ConstructionAPIService) ConstructionDerive(
 
 	args, err := blake2b.Blake160(request.PublicKey.Bytes)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
-		}
+		return nil, wrapErr(ServerError, err)
 	}
 
 	prefix := address.Mainnet
@@ -94,322 +271,76 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		prefix = address.Testnet
 	}
 
-	addr, err := address.Generate(prefix, &ckbTypes.Script{
-		CodeHash: ckbTypes.HexToHash("0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"),
-		HashType: ckbTypes.HashTypeType,
-		Args:     args,
-	})
-	if err != nil {
-		return nil, &types.Error{
-			Code:      5,
-			Message:   fmt.Sprintf("server error: %v", err),
-			Retriable: true,
+	var script *ckbTypes.Script
+	var lockType string
+	if request.Metadata != nil {
+		var metadata ckb.DeriveMetadata
+		if err := types.UnmarshalMap(request.Metadata, &metadata); err != nil {
+			return nil, wrapErr(InvalidDeriveMetadataError, err)
 		}
+		script, err = toScript(metadata.Script)
+		if err != nil {
+			return nil, wrapErr(ServerError, err)
+		}
+		lockType = getLockType(script, s.cfg)
+	} else {
+		script = &ckbTypes.Script{
+			CodeHash: ckbTypes.HexToHash(s.cfg.Secp256k1Blake160.Script.CodeHash),
+			HashType: ckbTypes.ScriptHashType(s.cfg.Secp256k1Blake160.Script.HashType),
+			Args:     args,
+		}
+		lockType = ckb.Secp256k1Blake160Lock.String()
 	}
+
+	addr, err := address.Generate(prefix, script)
+	if err != nil {
+		return nil, wrapErr(ServerError, err)
+	}
+
+	metadata, err := types.MarshalMap(&ckb.AccountIdentifierMetadata{
+		LockType: lockType,
+	})
 
 	return &types.ConstructionDeriveResponse{
-		Address: addr,
-	}, nil
-}
-
-// ConstructionHash implements the /construction/hash endpoint.
-func (s *ConstructionAPIService) ConstructionHash(
-	ctx context.Context,
-	request *types.ConstructionHashRequest,
-) (*types.TransactionIdentifierResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.SignedTransaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.SignedTransaction),
-			Retriable: false,
-		}
-	}
-	hash, err := tx.ComputeHash()
-	if err != nil {
-		return nil, &types.Error{
-			Code:      12,
-			Message:   fmt.Sprintf("compute hash error: %v", err),
-			Retriable: false,
-		}
-	}
-
-	return &types.TransactionIdentifierResponse{
-		TransactionIdentifier: &types.TransactionIdentifier{
-			Hash: hash.String(),
+		AccountIdentifier: &types.AccountIdentifier{
+			Address:  addr,
+			Metadata: metadata,
 		},
 	}, nil
 }
 
-// ConstructionParse implements the /construction/parse endpoint.
-func (s *ConstructionAPIService) ConstructionParse(
-	ctx context.Context,
-	request *types.ConstructionParseRequest,
-) (*types.ConstructionParseResponse, *types.Error) {
-	tx, err := ckbRpc.TransactionFromString(request.Transaction)
+func (s *ConstructionAPIService) parseTransaction(request *types.ConstructionParseRequest) (*types.ConstructionParseResponse, *types.Error) {
+	signedTx, err := rosettaTransactionFromString(request.Transaction)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("can not decode transaction string: %s", request.Transaction),
-			Retriable: false,
-		}
+		return nil, TransactionParseError
 	}
+	var operations []*types.Operation
 
-	signers := make(map[string]bool)
-	index := int64(0)
-	operations := make([]*types.Operation, 0)
-	for _, input := range tx.Inputs {
-		ptx, err := s.client.GetTransaction(ctx, input.PreviousOutput.TxHash)
-		if err != nil {
-			return nil, ServerError
-		}
-
-		addr := GenerateAddress(s.network, ptx.Transaction.Outputs[input.PreviousOutput.Index].Lock)
-		signers[addr] = true
+	for i, input := range signedTx.Inputs {
 		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
-			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: addr,
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%d", ptx.Transaction.Outputs[input.PreviousOutput.Index].Capacity),
-				Currency: CkbCurrency,
+			OperationIdentifier: &types.OperationIdentifier{Index: int64(len(operations))},
+			Type:                ckb.InputOpType,
+			Account:             signedTx.InputAccounts[i],
+			Amount:              signedTx.InputAmounts[i],
+			CoinChange: &types.CoinChange{
+				CoinIdentifier: getCoinIdentifier(input.PreviousOutput),
+				CoinAction:     types.CoinSpent,
 			},
 		})
-		index++
 	}
-	for _, output := range tx.Outputs {
+	for i := range signedTx.Outputs {
 		operations = append(operations, &types.Operation{
 			OperationIdentifier: &types.OperationIdentifier{
-				Index: index,
+				Index: int64(len(operations)),
 			},
-			Type:   "Transfer",
-			Status: "Success",
-			Account: &types.AccountIdentifier{
-				Address: GenerateAddress(s.network, output.Lock),
-			},
-			Amount: &types.Amount{
-				Value:    fmt.Sprintf("%d", output.Capacity),
-				Currency: CkbCurrency,
-			},
+			Type:    ckb.OutputOpType,
+			Account: signedTx.OutputAccounts[i],
+			Amount:  signedTx.OutputAmounts[i],
 		})
-		index++
-	}
-
-	addresses := make([]string, 0, len(signers))
-	for addr := range signers {
-		addresses = append(addresses, addr)
 	}
 
 	return &types.ConstructionParseResponse{
-		Operations: operations,
-		Signers:    addresses,
-	}, nil
-}
-
-// ConstructionPayloads implements the /construction/payloads endpoint.
-func (s *ConstructionAPIService) ConstructionPayloads(
-	ctx context.Context,
-	request *types.ConstructionPayloadsRequest,
-) (*types.ConstructionPayloadsResponse, *types.Error) {
-
-	systemScripts, err := utils.NewSystemScripts(s.client)
-	if err != nil {
-		return nil, ServerError
-	}
-
-	tx := ckbTransaction.NewSecp256k1SingleSigTx(systemScripts)
-	payloads := make([]*types.SigningPayload, 0)
-	for _, operation := range request.Operations {
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
-			addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
-			return nil, &types.Error{
-				Code:      7,
-				Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
-				Retriable: true,
-			}
-		}
-
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount == 0 {
-			return nil, &types.Error{
-				Code:      8,
-				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
-				Retriable: true,
-			}
-		}
-		if amount > 0 {
-			if amount < MinCapacity {
-				return nil, &types.Error{
-					Code:      9,
-					Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
-					Retriable: true,
-				}
-			}
-
-			tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
-				Capacity: uint64(amount),
-				Lock:     addr.Script,
-			})
-			tx.OutputsData = append(tx.OutputsData, []byte{})
-		} else {
-			amount = -amount
-
-			liveCells, err := s.client.GetCells(context.Background(), &indexer.SearchKey{
-				Script:     addr.Script,
-				ScriptType: indexer.ScriptTypeLock,
-			}, indexer.SearchOrderAsc, 1000, "")
-			if err != nil {
-				return nil, ServerError
-			}
-
-			fromCapacity := int64(0)
-			inputs := make([]*ckbTypes.Cell, 0)
-			for _, cell := range liveCells.Objects {
-				if cell.Output.Type == nil && len(cell.OutputData) == 0 {
-					fromCapacity += int64(cell.Output.Capacity)
-					inputs = append(inputs, &ckbTypes.Cell{
-						OutPoint: &ckbTypes.OutPoint{
-							TxHash: cell.OutPoint.TxHash,
-							Index:  cell.OutPoint.Index,
-						},
-					})
-					if fromCapacity < amount {
-						continue
-					}
-					if fromCapacity-amount >= MinCapacity {
-						tx.Outputs = append(tx.Outputs, &ckbTypes.CellOutput{
-							Capacity: uint64(fromCapacity - amount),
-							Lock:     addr.Script,
-						})
-						tx.OutputsData = append(tx.OutputsData, []byte{})
-					}
-				}
-			}
-
-			group, witnessArgs, err := ckbTransaction.AddInputsForTransaction(tx, inputs)
-			if err != nil {
-				return nil, ServerError
-			}
-
-			// TODO remove to transaction generated
-			payload, err := ckbTransaction.SingleSegmentSignMessage(tx, group[0], group[0]+len(group), witnessArgs)
-			if err != nil {
-				return nil, ServerError
-			}
-			payloads = append(payloads, &types.SigningPayload{
-				Address:       operation.Account.Address,
-				Bytes:         payload,
-				SignatureType: types.EcdsaRecovery,
-			})
-		}
-	}
-
-	txString, err := ckbRpc.TransactionString(tx)
-	return &types.ConstructionPayloadsResponse{
-		UnsignedTransaction: txString,
-		Payloads:            payloads,
-	}, nil
-}
-
-// ConstructionPreprocess implements the /construction/preprocess endpoint.
-func (s *ConstructionAPIService) ConstructionPreprocess(
-	ctx context.Context,
-	request *types.ConstructionPreprocessRequest,
-) (*types.ConstructionPreprocessResponse, *types.Error) {
-	input := int64(0)
-	output := int64(0)
-	for _, operation := range request.Operations {
-		addr, err := address.Parse(operation.Account.Address)
-		if err != nil || addr.Script.HashType != ckbTypes.HashTypeType ||
-			addr.Script.CodeHash.String() != "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8" {
-			return nil, &types.Error{
-				Code:      7,
-				Message:   fmt.Sprintf("error address: %s", operation.Account.Address),
-				Retriable: true,
-			}
-		}
-
-		amount, err := strconv.ParseInt(operation.Amount.Value, 10, 64)
-		if err != nil || amount == 0 {
-			return nil, &types.Error{
-				Code:      8,
-				Message:   fmt.Sprintf("error amount: %s", operation.Amount.Value),
-				Retriable: true,
-			}
-		}
-		if amount > 0 {
-			if amount < MinCapacity {
-				return nil, &types.Error{
-					Code:      9,
-					Message:   fmt.Sprintf("to small amount: %s", operation.Amount.Value),
-					Retriable: true,
-				}
-			}
-			output += amount
-		} else {
-			amount = -amount
-			capacity, err := s.client.GetCellsCapacity(context.Background(), &indexer.SearchKey{
-				Script:     addr.Script,
-				ScriptType: indexer.ScriptTypeLock,
-			})
-			if err != nil {
-				return nil, RpcError
-			}
-			if uint64(amount) > capacity.Capacity {
-				return nil, &types.Error{
-					Code:      10,
-					Message:   fmt.Sprintf("insufficient balance: %s", operation.Amount.Value),
-					Retriable: true,
-				}
-			}
-
-			input += amount
-		}
-	}
-
-	if output >= input {
-		return nil, &types.Error{
-			Code:      11,
-			Message:   fmt.Sprintf("capacity overflow"),
-			Retriable: true,
-		}
-	}
-
-	return &types.ConstructionPreprocessResponse{}, nil
-}
-
-// ConstructionSubmit implements the /construction/submit endpoint.
-func (s *ConstructionAPIService) ConstructionSubmit(
-	ctx context.Context,
-	request *types.ConstructionSubmitRequest,
-) (*types.TransactionIdentifierResponse, *types.Error) {
-	tx, err := ToTransaction(request.SignedTransaction)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      4,
-			Message:   fmt.Sprintf("submit transaction error: %v", err),
-			Retriable: true,
-		}
-	}
-
-	hash, err := s.client.SendTransaction(ctx, tx)
-	if err != nil {
-		return nil, &types.Error{
-			Code:      4,
-			Message:   fmt.Sprintf("submit transaction error: %v", err),
-			Retriable: true,
-		}
-	}
-
-	return &types.TransactionIdentifierResponse{
-		TransactionIdentifier: &types.TransactionIdentifier{
-			Hash: hash.String(),
-		},
+		Operations:               operations,
+		AccountIdentifierSigners: signedTx.AccountIdentifierSigners,
 	}, nil
 }

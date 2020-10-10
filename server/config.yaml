@@ -1,3 +1,36 @@
 port: 8080
 network: Mainnet
 rich_node_rpc: 'http://localhost:8117'
+secp256k1Blake160:
+  deps:
+    - txHash: 0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c
+      index: 0
+      depType: dep_group
+  script:
+    codeHash: 0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8
+    hashType: type
+secp256k1Blake160Mutisig:
+  deps:
+    - txHash: 0x71a7ba8fc96349fea0ed3a5c47992e3b4084b031a42264a018e0072e8172e46c
+      index: 1
+      hashType: type
+  script:
+    codeHash: 0x5c5069eb0857efc65e1bca0c07df34c31663b3622fd3876c876320fc9634e2a8
+    hashType: type
+acp:
+  deps:
+    - txHash: 0xa05f28c9b867f8c5682039c10d8e864cf661685252aa74a008d255c33813bb81
+      index: 0
+      depType: dep_group
+  script:
+    codeHash: 0x0fb343953ee78c9986b091defb6252154e0bb51044fd2879fde5b27314506111
+    hashType: data
+
+udt:
+  deps:
+    - txHash: 0xc7813f6a415144643970c2e88e0bb6ca6a8edc5dd7c1022746f628284a9936d5
+      index: 0
+      depType: code
+  script:
+    codeHash: 0x5e7a36a77e68eecc013dfa2fe6a23f3b6c344b04005808694ae6dd45eea4cfd5
+    hashType: type
