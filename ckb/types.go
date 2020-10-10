@@ -24,7 +24,7 @@ const (
 )
 
 func (l LockType) String() string {
-	return [...]string{"Secp256k1Blake160Lock", "Secp256k1Blake160Multisig"}[l]
+	return [...]string{"Secp256k1Blake160Lock", "Secp256k1Blake160Multisig", "UnknownLock"}[l]
 }
 
 type LockType int
