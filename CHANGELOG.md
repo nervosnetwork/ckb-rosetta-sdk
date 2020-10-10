@@ -1,4 +1,4 @@
-# [v0.3.1](https://github.com/shaojunda/ckb-rosetta-sdk/compare/v0.3.0...v0.3.1) (2020-10-10)
+# [v0.3.1](https://github.com/nervosnetwork/ckb-rosetta-sdk/compare/v0.3.0...v0.3.1) (2020-10-10)
 
 * only return ckb coins on account/balance endpoint ([c23b878](https://github.com/nervosnetwork/ckb-rosetta-sdk/commit/c23b878))
 
