@@ -50,16 +50,14 @@ func (s *AccountAPIService) AccountBalance(
 			return nil, wrapErr(ServerError, err)
 		}
 		for _, cell := range liveCells.Objects {
-			if cell.Output.Type == nil && len(cell.OutputData) == 0 {
-				ckbBalance += cell.Output.Capacity
-				ckbCoins = append(ckbCoins, &types.Coin{
-					CoinIdentifier: &types.CoinIdentifier{Identifier: fmt.Sprintf("%s:%d", cell.OutPoint.TxHash, cell.OutPoint.Index)},
-					Amount: &types.Amount{
-						Value:    fmt.Sprintf("%d", cell.Output.Capacity),
-						Currency: CkbCurrency,
-					},
-				})
-			}
+			ckbBalance += cell.Output.Capacity
+			ckbCoins = append(ckbCoins, &types.Coin{
+				CoinIdentifier: &types.CoinIdentifier{Identifier: fmt.Sprintf("%s:%d", cell.OutPoint.TxHash, cell.OutPoint.Index)},
+				Amount: &types.Amount{
+					Value:    fmt.Sprintf("%d", cell.Output.Capacity),
+					Currency: CkbCurrency,
+				},
+			})
 		}
 		if len(liveCells.Objects) < ckb.SearchLimit || liveCells.LastCursor == "" {
 			break
