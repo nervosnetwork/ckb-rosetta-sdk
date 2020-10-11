@@ -1,0 +1,182 @@
+request_funds(1){
+  find_account{
+    currency = {
+      "symbol":"CKB",
+      "decimals":8
+    };
+    random_account = find_balance({
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 1
+    });
+  },
+  request{
+    loaded_account = find_balance({
+      "require_coin":true,
+      "account_identifier": {{random_account.account_identifier}},
+      "minimum_balance": {
+        "value": "30000000000",
+        "currency": {{currency}}
+      }
+    });
+  }
+}
+
+create_account(1){
+  create{
+    network = {"network":"mainnet", "blockchain":"CKB"};
+    key = generate_key({"curve_type":"secp256k1"});
+    account = derive({
+      "network_identifier": {{network}},
+      "public_key": {{key.public_key}}
+    });
+    save_account({
+      "account_identifier": {{account.account_identifier}},
+      "keypair": {{key}}
+    });
+  }
+}
+
+transfer(2){
+  transfer_dry_run{
+    transfer_dry_run.network = {"network":"mainnet", "blockchain":"CKB"};
+    currency = {"symbol":"CKB","decimals":8};
+    max_fee = "1200";
+    sender = find_balance({
+      "require_coin":true,
+      "minimum_balance": {
+        "value": "7000000000",
+        "currency": {{currency}}
+      }
+    });
+    available_amount = {{sender.balance.value}} - {{max_fee}};
+    print_message({"available_amount":{{available_amount}}});
+    recipient_amount = random_number({"minimum":"10000000000", "maximum":"20000000000"});
+    print_message({"recipient_amount":{{recipient_amount}}});
+    total_change_amount = {{sender.balance.value}} - {{recipient_amount}};
+    change_amount = {{total_change_amount}} - {{max_fee}};
+    print_message({"change_amount":{{change_amount}}});
+    sender_amount = "0" - {{sender.balance.value}};
+    print_message({"sender_amount":{{sender_amount}}});
+
+    recipient = find_balance({
+      "not_account_identifier": [{{sender.account_identifier}}],
+      "not_coins": [{{sender.coin}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+    transfer_dry_run.confirmation_depth = "1";
+    transfer_dry_run.dry_run = true;
+    transfer_dry_run.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"INPUT",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        },
+        "coin_change":{
+          "coin_action":"coin_spent",
+          "coin_identifier":{{sender.coin}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"OUTPUT",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "type":"OUTPUT",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{change_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+    print_message({"transfer_dry_run.operations":{{transfer_dry_run.operations}}});
+  },
+  transfer{
+    suggested_fee = find_currency_amount({
+      "currency": {{currency}},
+      "amounts": {{transfer_dry_run.suggested_fee}}
+    });
+    print_message({"suggested_fee":{{transfer_dry_run.suggested_fee}}});
+    transfer.network = {"network":"mainnet", "blockchain":"CKB"};
+    currency = {"symbol":"CKB","decimals":8};
+    sender = find_balance({
+      "require_coin":true,
+      "minimum_balance": {
+        "value": "7000000000",
+        "currency": {{currency}}
+      }
+    });
+
+    // Set the recipient_amount as some value <= sender.balance-max_fee
+    max_fee = "1200";
+    available_amount = {{sender.balance.value}} - {{max_fee}};
+    recipient_amount = random_number({"minimum":"10000000000", "maximum":"20000000000"});
+    print_message({"recipient_amount":{{recipient_amount}}});
+    total_change_amount = {{sender.balance.value}} - {{recipient_amount}};
+    print_message({"total_change_amount":{{total_change_amount}}});
+    change_amount = {{total_change_amount}} - {{suggested_fee.value}};
+
+    // Find recipient and construct operations
+    sender_amount = "0" - {{sender.balance.value}};
+    recipient = find_balance({
+      "not_account_identifier":[{{sender.account_identifier}}],
+      "minimum_balance":{
+        "value": "0",
+        "currency": {{currency}}
+      },
+      "create_limit": 100,
+      "create_probability": 50
+    });
+    transfer.confirmation_depth = "1";
+    transfer.operations = [
+      {
+        "operation_identifier":{"index":0},
+        "type":"INPUT",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value":{{sender_amount}},
+          "currency":{{currency}}
+        },
+        "coin_change":{
+          "coin_action":"coin_spent",
+          "coin_identifier":{{sender.coin}}
+        }
+      },
+      {
+        "operation_identifier":{"index":1},
+        "type":"OUTPUT",
+        "account":{{recipient.account_identifier}},
+        "amount":{
+          "value":{{recipient_amount}},
+          "currency":{{currency}}
+        }
+      },
+      {
+        "operation_identifier":{"index":2},
+        "type":"OUTPUT",
+        "account":{{sender.account_identifier}},
+        "amount":{
+          "value": {{change_amount}},
+          "currency":{{currency}}
+        }
+      }
+    ];
+  }
+}
