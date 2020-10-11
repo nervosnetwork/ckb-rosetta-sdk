@@ -9,6 +9,8 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    outputs:
+      output1: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -19,44 +21,49 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }} (${{ setps.current_date.outputs.date }})
+          release_name: ${{ github.ref }} (${{ steps.current_date.outputs.date }})
+          body_path: ./RELEASENOTES.md
           draft: true
           prerelease: false
   publish:
-    name: Publish for ${{ matrix.os }}
+    needs: release
+    name: Upload Release Asset For ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: [1.14, 1.15]
         include:
           - os: ubuntu-latest
-            artifact_name: rosetta-server
-            asset_name: rosetta-server-linux-amd64
+            artifact_name: server
+            asset_name: server-linux-amd64
           - os: windows-latest
-            artifact_name: rosetta-server.exe
-            asset_name: rosetta-server-windows-amd64
+            artifact_name: server.exe
+            asset_name: server-windows-amd64
           - os: macos-latest
-            artifact_name: rosetta-server
-            asset_name: rosetta-server-macos-amd64
+            artifact_name: server
+            asset_name: server-macos-amd64
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Set up Go
-        uses: actionis/setup-go@v2
+        uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.go }}
+          go-version: 1.14
       - name: Build
         run: |
           cd server
-          go build -o rosetta-server
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+          go build
+          tar zcvf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.artifact_name }}
-          asset_name: ${{ matrix.asset_name }}
-          tag: ${{ github.ref }}
+          upload_url: ${{ needs.release.outputs.output1 }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+          asset_path: ./server/${{ matrix.asset_name }}.tar.gz
+          asset_name:  ${{ matrix.asset_name }}.tar.gz
+          asset_content_type: application/tar+gzip
 
