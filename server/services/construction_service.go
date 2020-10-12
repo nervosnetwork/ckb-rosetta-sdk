@@ -267,7 +267,7 @@ func (s *ConstructionAPIService) ConstructionDerive(
 	}
 
 	prefix := address.Mainnet
-	if s.network.Network != "Mainnet" {
+	if s.network.Network != s.cfg.Network {
 		prefix = address.Testnet
 	}
 
