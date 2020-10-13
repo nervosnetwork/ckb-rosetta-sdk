@@ -1,8 +1,7 @@
-# [v0.3.4](https://github.com/nervosnetwork/ckb-rosetta-sdk/compare/v0.3.3...v0.3.4) (2020-10-12)
+# [v0.3.5](https://github.com/nervosnetwork/ckb-rosetta-sdk/compare/v0.3.4...v0.3.5) (2020-10-13)
 
 
-### Features
+### Bug Fixes
 
-* use config Network replace string var ([d486aea](https://github.com/nervosnetwork/ckb-rosetta-sdk/commit/d486aea))
-
+* wrong prefix ([2b83d55](https://github.com/nervosnetwork/ckb-rosetta-sdk/commit/2b83d55))
 
