@@ -53,7 +53,7 @@ transfer(2){
     });
     available_amount = {{sender.balance.value}} - {{max_fee}};
     print_message({"available_amount":{{available_amount}}});
-    recipient_amount = random_number({"minimum":"10000000000", "maximum":"20000000000"});
+    recipient_amount = random_number({"minimum":"6100000000", "maximum":"7000000000"});
     print_message({"recipient_amount":{{recipient_amount}}});
     total_change_amount = {{sender.balance.value}} - {{recipient_amount}};
     change_amount = {{total_change_amount}} - {{max_fee}};
@@ -127,7 +127,7 @@ transfer(2){
     // Set the recipient_amount as some value <= sender.balance-max_fee
     max_fee = "1200";
     available_amount = {{sender.balance.value}} - {{max_fee}};
-    recipient_amount = random_number({"minimum":"10000000000", "maximum":"20000000000"});
+    recipient_amount = random_number({"minimum":"6100000000", "maximum":"7000000000"});
     print_message({"recipient_amount":{{recipient_amount}}});
     total_change_amount = {{sender.balance.value}} - {{recipient_amount}};
     print_message({"total_change_amount":{{total_change_amount}}});
