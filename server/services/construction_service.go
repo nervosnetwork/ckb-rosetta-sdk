@@ -266,8 +266,11 @@ func (s *ConstructionAPIService) ConstructionDerive(
 		return nil, wrapErr(ServerError, err)
 	}
 
+	if _, ok := SupportedNetworks[s.network.Network]; !ok {
+		return nil, wrapErr(UnsupportedNetworkError, fmt.Errorf("network %s not supported", s.network.Network))
+	}
 	prefix := address.Mainnet
-	if s.network.Network != s.cfg.Network {
+	if s.network.Network != "mainnet" {
 		prefix = address.Testnet
 	}
 

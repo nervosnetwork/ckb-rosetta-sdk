@@ -222,6 +222,12 @@ var (
 		Retriable: false,
 	}
 
+	UnsupportedNetworkError = &types.Error{
+		Code:      37,
+		Message:   "unsupported network error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -231,6 +237,12 @@ var (
 		ckb.InputOpType,
 		ckb.OutputOpType,
 		ckb.RewardOpType,
+	}
+
+	SupportedNetworks = map[string]bool{
+		"mainnet": true,
+		"testnet": true,
+		"dev":     true,
 	}
 
 	SupportedConstructionTypes = map[string]bool{
@@ -272,6 +284,7 @@ var (
 		TransactionParseError,
 		InvalidAccountIdentifierMetadataError,
 		AddressGenerationError,
+		UnsupportedNetworkError,
 	}
 )
 
