@@ -23,7 +23,7 @@
     "results_output_file": "./mainnet_construction_result.json",
     "constructor_dsl_file": "ckb_mainnet.ros",
     "end_conditions": {
-      "create_account": 10,
+      "create_account": 2,
       "transfer": 2
     }
   },
