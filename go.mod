@@ -8,6 +8,6 @@ require (
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/ethereum/go-ethereum v1.9.21
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/nervosnetwork/ckb-sdk-go v0.0.0-20200921070645-0b9f312327c4
+	github.com/nervosnetwork/ckb-sdk-go v0.0.0-20201015053143-b22f752efca4
 	gopkg.in/yaml.v2 v2.3.0
 )
