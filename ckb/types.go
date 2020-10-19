@@ -56,3 +56,7 @@ type Script struct {
 type DeriveMetadata struct {
 	Script `json:"script"`
 }
+
+type AmountMetadata struct {
+	AvailableCkbBalance uint64 `json:"available_ckb_balance"`
+}

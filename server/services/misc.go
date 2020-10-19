@@ -228,6 +228,18 @@ var (
 		Retriable: false,
 	}
 
+	SudtAmountInvalidError = &types.Error{
+		Code:      38,
+		Message:   "sudt amount invalid error.",
+		Retriable: false,
+	}
+
+	InvalidAmountMetadataError = &types.Error{
+		Code:      39,
+		Message:   "invalid amount metadata error.",
+		Retriable: false,
+	}
+
 	CkbCurrency = &types.Currency{
 		Symbol:   "CKB",
 		Decimals: 8,
@@ -285,6 +297,8 @@ var (
 		InvalidAccountIdentifierMetadataError,
 		AddressGenerationError,
 		UnsupportedNetworkError,
+		SudtAmountInvalidError,
+		InvalidAmountMetadataError,
 	}
 )
 
