@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/ckb"
 	"github.com/nervosnetwork/ckb-rosetta-sdk/server/config"
+	"math"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -196,6 +197,20 @@ func (s *BlockAPIService) Block(
 				if err != nil {
 					return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
 				}
+				var metadata map[string]interface{}
+				var availableCkbBalance uint64
+				ckbBalance := output.Capacity
+				if output.Type == nil && len(tx.OutputsData[i]) == 0 {
+					availableCkbBalance += output.Capacity
+				} else {
+					availableCkbBalance += output.Capacity - output.OccupiedCapacity(tx.OutputsData[i])*uint64(math.Pow10(8))
+				}
+				metadata, err = types.MarshalMap(&ckb.AmountMetadata{
+					AvailableCkbBalance: availableCkbBalance,
+				})
+				if err != nil {
+					return nil, wrapErr(InvalidAmountMetadataError, err)
+				}
 				transaction.Operations = append(transaction.Operations, &types.Operation{
 					OperationIdentifier: &types.OperationIdentifier{
 						Index: optIndex,
@@ -207,8 +222,9 @@ func (s *BlockAPIService) Block(
 						Metadata: accountMetadata,
 					},
 					Amount: &types.Amount{
-						Value:    fmt.Sprintf("%d", output.Capacity),
+						Value:    fmt.Sprintf("%d", ckbBalance),
 						Currency: CkbCurrency,
+						Metadata: metadata,
 					},
 					CoinChange: &types.CoinChange{
 						CoinIdentifier: getCoinIdentifier(&ckbTypes.OutPoint{
@@ -293,6 +309,20 @@ func (s *BlockAPIService) BlockTransaction(
 			if err != nil {
 				return nil, wrapErr(InvalidAccountIdentifierMetadataError, err)
 			}
+			var metadata map[string]interface{}
+			var availableCkbBalance uint64
+			ckbBalance := output.Capacity
+			if output.Type == nil && len(tx.Transaction.OutputsData[i]) == 0 {
+				availableCkbBalance += output.Capacity
+			} else {
+				availableCkbBalance += output.Capacity - output.OccupiedCapacity(tx.Transaction.OutputsData[i])*uint64(math.Pow10(8))
+			}
+			metadata, err = types.MarshalMap(&ckb.AmountMetadata{
+				AvailableCkbBalance: availableCkbBalance,
+			})
+			if err != nil {
+				return nil, wrapErr(InvalidAmountMetadataError, err)
+			}
 			transaction.Operations = append(transaction.Operations, &types.Operation{
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: optIndex,
@@ -304,8 +334,9 @@ func (s *BlockAPIService) BlockTransaction(
 					Metadata: accountMetadata,
 				},
 				Amount: &types.Amount{
-					Value:    fmt.Sprintf("%d", output.Capacity),
+					Value:    fmt.Sprintf("%d", ckbBalance),
 					Currency: CkbCurrency,
+					Metadata: metadata,
 				},
 				CoinChange: &types.CoinChange{
 					CoinIdentifier: getCoinIdentifier(&ckbTypes.OutPoint{
